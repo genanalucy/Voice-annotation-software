@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+.DS_Store
+
+build/
+dist/
+*.spec
+
+json/
+test_mp3/
+
+.vscode/
