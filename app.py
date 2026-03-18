@@ -434,9 +434,11 @@ class AnnotationWindow(QMainWindow):
         self.time_label.setText(f"{format_ms(self.player.position())} / {format_ms(duration)}")
 
     def _on_media_status_changed(self, status: QMediaPlayer.MediaStatus) -> None:
-        if status == QMediaPlayer.EndOfMedia and self.audio_index < len(self.audio_files) - 1:
-            self.audio_index += 1
-            self.load_current_audio()
+        if status == QMediaPlayer.EndOfMedia:
+            self.player.pause()
+            self.player.setPosition(0)
+            self.progress_slider.setValue(0)
+            self.time_label.setText(f"00:00 / {format_ms(self.player.duration())}")
 
     def current_audio_path(self) -> Path | None:
         if not self.audio_files or self.audio_index < 0:
