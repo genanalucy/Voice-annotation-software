@@ -22,7 +22,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QPlainTextEdit,
     QRadioButton,
+    QScrollArea,
     QSlider,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -128,7 +130,22 @@ class AnnotationWindow(QMainWindow):
         self.root.setObjectName("appRoot")
         self.setCentralWidget(self.root)
 
-        main_layout = QVBoxLayout(self.root)
+        root_layout = QVBoxLayout(self.root)
+        root_layout.setContentsMargins(0, 0, 0, 0)
+        root_layout.setSpacing(0)
+
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setObjectName("mainScrollArea")
+        root_layout.addWidget(scroll_area)
+
+        content = QWidget()
+        content.setObjectName("contentWidget")
+        scroll_area.setWidget(content)
+
+        main_layout = QVBoxLayout(content)
         main_layout.setContentsMargins(18, 18, 18, 18)
         main_layout.setSpacing(14)
 
@@ -241,8 +258,8 @@ class AnnotationWindow(QMainWindow):
         self.questions_layout.setSpacing(12)
         self._build_question_groups()
 
-        questions_shell_layout.addWidget(questions_panel, 1)
-        main_layout.addWidget(questions_shell, 1)
+        questions_shell_layout.addWidget(questions_panel)
+        main_layout.addWidget(questions_shell)
 
         remark_card, remark_layout = self.create_glass_card("panelCard", 16, 16, 16, 16)
         remark_title = QLabel("描述音频")
@@ -286,6 +303,7 @@ class AnnotationWindow(QMainWindow):
         actions.addStretch()
         action_layout.addLayout(actions)
         main_layout.addWidget(action_card)
+        main_layout.addStretch()
 
     def _build_question_groups(self) -> None:
         questions = [question for section in QUESTION_SECTIONS for question in section["questions"]]
@@ -302,6 +320,7 @@ class AnnotationWindow(QMainWindow):
             self.question_labels[question["key"]] = question["label"]
 
             card, card_layout = self.create_glass_card("questionCard", 14, 14, 14, 14)
+            card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
             card_layout.setSpacing(8)
 
             label = QLabel(f"{question['label']}  ({question['key']})")
