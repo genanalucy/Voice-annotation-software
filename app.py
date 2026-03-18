@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QFrame,
     QGridLayout,
-    QGroupBox,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -23,7 +22,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QPlainTextEdit,
     QRadioButton,
-    QScrollArea,
     QSlider,
     QVBoxLayout,
     QWidget,
@@ -141,17 +139,13 @@ class AnnotationWindow(QMainWindow):
         control_layout.addStretch()
         main_layout.addLayout(control_layout)
 
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_content = QWidget()
-        self.questions_layout = QVBoxLayout(scroll_content)
-        self.questions_layout.setContentsMargins(4, 4, 4, 4)
-        self.questions_layout.setSpacing(8)
+        questions_panel = QWidget()
+        self.questions_layout = QGridLayout(questions_panel)
+        self.questions_layout.setContentsMargins(2, 2, 2, 2)
+        self.questions_layout.setHorizontalSpacing(8)
+        self.questions_layout.setVerticalSpacing(8)
         self._build_question_groups()
-        self.questions_layout.addStretch()
-        scroll_area.setWidget(scroll_content)
-        main_layout.addWidget(scroll_area, 1)
+        main_layout.addWidget(questions_panel, 1)
 
         remark_title = QLabel("备注")
         remark_title.setStyleSheet("font-size: 16px; font-weight: 700;")
@@ -185,57 +179,52 @@ class AnnotationWindow(QMainWindow):
         self.menuBar().addAction(open_folder_action)
 
     def _build_question_groups(self) -> None:
-        for section in QUESTION_SECTIONS:
-            section_box = QGroupBox(section["title"])
-            section_box.setStyleSheet("QGroupBox { font-size: 15px; font-weight: 700; }")
-            section_layout = QGridLayout(section_box)
-            section_layout.setContentsMargins(8, 10, 8, 8)
-            section_layout.setHorizontalSpacing(8)
-            section_layout.setVerticalSpacing(8)
+        questions = [question for section in QUESTION_SECTIONS for question in section["questions"]]
 
-            for index, question in enumerate(section["questions"]):
-                self.question_labels[question["key"]] = question["label"]
-                self.question_types[question["key"]] = question["type"]
+        for index, question in enumerate(questions):
+            self.question_labels[question["key"]] = question["label"]
+            self.question_types[question["key"]] = question["type"]
 
-                card = QFrame()
-                card.setFrameShape(QFrame.StyledPanel)
-                card.setStyleSheet("QFrame { background: white; border: 1px solid #d9dee7; border-radius: 8px; }")
-                card_layout = QVBoxLayout(card)
-                card_layout.setContentsMargins(8, 8, 8, 8)
-                card_layout.setSpacing(4)
+            card = QFrame()
+            card.setFrameShape(QFrame.StyledPanel)
+            card.setStyleSheet("QFrame { background: white; border: 1px solid #d9dee7; border-radius: 8px; }")
+            card_layout = QVBoxLayout(card)
+            card_layout.setContentsMargins(8, 8, 8, 8)
+            card_layout.setSpacing(3)
 
-                label = QLabel(f"{question['label']}  ({question['key']})")
-                label.setWordWrap(True)
-                label.setStyleSheet("font-size: 13px; font-weight: 700;")
-                card_layout.addWidget(label)
+            label = QLabel(f"{question['label']}  ({question['key']})")
+            label.setWordWrap(True)
+            label.setStyleSheet("font-size: 12px; font-weight: 700;")
+            card_layout.addWidget(label)
 
-                if question["type"] == "single":
-                    group = QButtonGroup(self)
-                    group.setExclusive(True)
-                    self.single_groups[question["key"]] = group
-                    for option in question["options"]:
-                        button = QRadioButton(f"{option['label']}  [{option['value']}]")
-                        button.setProperty("value", option["value"])
-                        button.setStyleSheet("font-size: 12px;")
-                        button.toggled.connect(self.update_summary)
-                        group.addButton(button)
-                        card_layout.addWidget(button)
-                else:
-                    checkboxes: list[QCheckBox] = []
-                    self.multi_groups[question["key"]] = checkboxes
-                    for option in question["options"]:
-                        checkbox = QCheckBox(f"{option['label']}  [{option['value']}]")
-                        checkbox.setProperty("value", option["value"])
-                        checkbox.setStyleSheet("font-size: 12px;")
-                        checkbox.stateChanged.connect(self.update_summary)
-                        checkboxes.append(checkbox)
-                        card_layout.addWidget(checkbox)
+            if question["type"] == "single":
+                group = QButtonGroup(self)
+                group.setExclusive(True)
+                self.single_groups[question["key"]] = group
+                for option in question["options"]:
+                    button = QRadioButton(f"{option['label']}  [{option['value']}]")
+                    button.setProperty("value", option["value"])
+                    button.setStyleSheet("font-size: 11px;")
+                    button.toggled.connect(self.update_summary)
+                    group.addButton(button)
+                    card_layout.addWidget(button)
+            else:
+                checkboxes: list[QCheckBox] = []
+                self.multi_groups[question["key"]] = checkboxes
+                for option in question["options"]:
+                    checkbox = QCheckBox(f"{option['label']}  [{option['value']}]")
+                    checkbox.setProperty("value", option["value"])
+                    checkbox.setStyleSheet("font-size: 11px;")
+                    checkbox.stateChanged.connect(self.update_summary)
+                    checkboxes.append(checkbox)
+                    card_layout.addWidget(checkbox)
 
-                row = index // 3
-                column = index % 3
-                section_layout.addWidget(card, row, column)
+            row = index // 3
+            column = index % 3
+            self.questions_layout.addWidget(card, row, column)
 
-            self.questions_layout.addWidget(section_box)
+        for column in range(3):
+            self.questions_layout.setColumnStretch(column, 1)
 
     def _connect_player_signals(self) -> None:
         self.player.positionChanged.connect(self._sync_position)
