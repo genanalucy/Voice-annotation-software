@@ -106,23 +106,6 @@ QUESTION_SECTIONS = [
             },
         ],
     },
-    {
-        "title": "模块三：终极目标标签（目标变量 Target Y）",
-        "questions": [
-            {
-                "key": "final_decision",
-                "label": "综合处理建议",
-                "type": "single",
-                "options": [
-                    {"label": "1. 完美可用", "value": "完美可用"},
-                    {"label": "2. 带噪可用", "value": "带噪可用"},
-                    {"label": "3. 需要重新切分", "value": "需要重新切分"},
-                    {"label": "4. 废弃", "value": "废弃"},
-                ],
-            }
-        ],
-    },
 ]
 
-REMARK_KEY = "remark"
-
+REMARK_KEY = "audio_description"

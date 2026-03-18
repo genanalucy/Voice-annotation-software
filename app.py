@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QFrame,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -140,38 +139,48 @@ class AnnotationWindow(QMainWindow):
         main_layout.addLayout(control_layout)
 
         questions_panel = QWidget()
-        self.questions_layout = QGridLayout(questions_panel)
+        self.questions_layout = QHBoxLayout(questions_panel)
         self.questions_layout.setContentsMargins(2, 2, 2, 2)
-        self.questions_layout.setHorizontalSpacing(8)
-        self.questions_layout.setVerticalSpacing(8)
+        self.questions_layout.setSpacing(8)
         self._build_question_groups()
         main_layout.addWidget(questions_panel, 1)
 
-        remark_title = QLabel("备注")
-        remark_title.setStyleSheet("font-size: 16px; font-weight: 700;")
+        remark_title = QLabel("描述音频")
+        remark_title.setStyleSheet("font-size: 18px; font-weight: 700;")
         self.remark_edit = QPlainTextEdit()
-        self.remark_edit.setPlaceholderText("填写异常情况、需要补充的信息等。")
+        self.remark_edit.setPlaceholderText("简要描述这段音频的内容、场景或特殊情况。")
         self.remark_edit.textChanged.connect(self.update_summary)
         self.remark_edit.setFixedHeight(58)
+        self.remark_edit.setStyleSheet("font-size: 13px; padding: 6px 8px;")
         main_layout.addWidget(remark_title)
         main_layout.addWidget(self.remark_edit, 0)
 
         bottom_layout = QHBoxLayout()
-        bottom_layout.addStretch()
+        bottom_layout.setSpacing(12)
 
         self.preview_button = QPushButton("预览 JSON")
         self.preview_button.clicked.connect(self.show_preview_dialog)
         self.reset_button = QPushButton("重做")
         self.reset_button.clicked.connect(self.reset_current_annotation)
+        self.reset_button.setMinimumHeight(52)
+        self.reset_button.setMinimumWidth(180)
+        self.reset_button.setStyleSheet("font-size: 16px; font-weight: 700;")
         self.submit_button = QPushButton("提交")
         self.submit_button.clicked.connect(self.submit_annotation)
+        self.submit_button.setMinimumHeight(52)
+        self.submit_button.setMinimumWidth(220)
         self.submit_button.setStyleSheet(
-            "background: #1f6feb; color: white; font-weight: 700; padding: 8px 24px;"
+            "background: #1f6feb; color: white; font-size: 16px; font-weight: 700; padding: 10px 30px;"
         )
+        self.preview_button.setMinimumHeight(52)
+        self.preview_button.setMinimumWidth(180)
+        self.preview_button.setStyleSheet("font-size: 16px; font-weight: 700;")
 
+        bottom_layout.addStretch()
         bottom_layout.addWidget(self.preview_button)
         bottom_layout.addWidget(self.reset_button)
         bottom_layout.addWidget(self.submit_button)
+        bottom_layout.addStretch()
         main_layout.addLayout(bottom_layout)
 
         open_folder_action = QAction("打开音频文件夹", self)
@@ -180,6 +189,14 @@ class AnnotationWindow(QMainWindow):
 
     def _build_question_groups(self) -> None:
         questions = [question for section in QUESTION_SECTIONS for question in section["questions"]]
+        column_layouts: list[QVBoxLayout] = []
+
+        for _ in range(3):
+            column = QVBoxLayout()
+            column.setSpacing(8)
+            column.setContentsMargins(0, 0, 0, 0)
+            column_layouts.append(column)
+            self.questions_layout.addLayout(column, 1)
 
         for index, question in enumerate(questions):
             self.question_labels[question["key"]] = question["label"]
@@ -187,14 +204,16 @@ class AnnotationWindow(QMainWindow):
 
             card = QFrame()
             card.setFrameShape(QFrame.StyledPanel)
-            card.setStyleSheet("QFrame { background: white; border: 1px solid #d9dee7; border-radius: 8px; }")
+            card.setStyleSheet(
+                "QFrame { background: white; border: 1px solid #d9dee7; border-radius: 10px; }"
+            )
             card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(8, 8, 8, 8)
-            card_layout.setSpacing(3)
+            card_layout.setContentsMargins(12, 10, 12, 10)
+            card_layout.setSpacing(4)
 
             label = QLabel(f"{question['label']}  ({question['key']})")
             label.setWordWrap(True)
-            label.setStyleSheet("font-size: 12px; font-weight: 700;")
+            label.setStyleSheet("font-size: 14px; font-weight: 700;")
             card_layout.addWidget(label)
 
             if question["type"] == "single":
@@ -204,7 +223,7 @@ class AnnotationWindow(QMainWindow):
                 for option in question["options"]:
                     button = QRadioButton(f"{option['label']}  [{option['value']}]")
                     button.setProperty("value", option["value"])
-                    button.setStyleSheet("font-size: 11px;")
+                    button.setStyleSheet("font-size: 11px; padding-top: 1px; padding-bottom: 1px;")
                     button.toggled.connect(self.update_summary)
                     group.addButton(button)
                     card_layout.addWidget(button)
@@ -214,17 +233,15 @@ class AnnotationWindow(QMainWindow):
                 for option in question["options"]:
                     checkbox = QCheckBox(f"{option['label']}  [{option['value']}]")
                     checkbox.setProperty("value", option["value"])
-                    checkbox.setStyleSheet("font-size: 11px;")
+                    checkbox.setStyleSheet("font-size: 11px; padding-top: 1px; padding-bottom: 1px;")
                     checkbox.stateChanged.connect(self.update_summary)
                     checkboxes.append(checkbox)
                     card_layout.addWidget(checkbox)
 
-            row = index // 3
-            column = index % 3
-            self.questions_layout.addWidget(card, row, column)
+            column_layouts[index % 3].addWidget(card)
 
-        for column in range(3):
-            self.questions_layout.setColumnStretch(column, 1)
+        for column in column_layouts:
+            column.addStretch()
 
     def _connect_player_signals(self) -> None:
         self.player.positionChanged.connect(self._sync_position)
