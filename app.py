@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QSignalBlocker, Qt, QUrl
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QColor
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QFrame,
+    QGraphicsDropShadowEffect,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -41,6 +42,47 @@ SUPPORTED_AUDIO_EXTENSIONS = {
     ".wma",
 }
 
+THEMES = {
+    "light": {
+        "window_start": "#f4f7fb",
+        "window_end": "#e8eef8",
+        "panel_bg": "rgba(255, 255, 255, 0.72)",
+        "panel_alt_bg": "rgba(255, 255, 255, 0.58)",
+        "card_bg": "rgba(255, 255, 255, 0.86)",
+        "card_border": "rgba(124, 146, 181, 0.22)",
+        "text_primary": "#162033",
+        "text_muted": "#5f6f8f",
+        "accent": "#1f6feb",
+        "accent_hover": "#175fd1",
+        "secondary_bg": "rgba(223, 231, 245, 0.72)",
+        "secondary_hover": "rgba(214, 225, 242, 0.96)",
+        "input_bg": "rgba(250, 252, 255, 0.92)",
+        "input_border": "rgba(154, 172, 204, 0.35)",
+        "shadow": "#adc1e6",
+        "shadow_alpha": 80,
+        "slider_groove": "rgba(173, 190, 220, 0.45)",
+    },
+    "dark": {
+        "window_start": "#0f1726",
+        "window_end": "#172235",
+        "panel_bg": "rgba(18, 28, 44, 0.76)",
+        "panel_alt_bg": "rgba(18, 28, 44, 0.66)",
+        "card_bg": "rgba(24, 36, 56, 0.88)",
+        "card_border": "rgba(138, 166, 214, 0.22)",
+        "text_primary": "#f4f7ff",
+        "text_muted": "#a9b6cf",
+        "accent": "#6ea8ff",
+        "accent_hover": "#5c97f4",
+        "secondary_bg": "rgba(38, 54, 80, 0.9)",
+        "secondary_hover": "rgba(50, 68, 98, 0.96)",
+        "input_bg": "rgba(18, 28, 44, 0.95)",
+        "input_border": "rgba(112, 139, 184, 0.35)",
+        "shadow": "#08111f",
+        "shadow_alpha": 160,
+        "slider_groove": "rgba(90, 114, 156, 0.54)",
+    },
+}
+
 
 def format_ms(ms: int) -> str:
     seconds = max(ms, 0) // 1000
@@ -55,7 +97,7 @@ class AnnotationWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("语音标注软件")
-        self.resize(1500, 880)
+        self.resize(1520, 900)
 
         self.audio_files: list[Path] = []
         self.audio_index = -1
@@ -71,121 +113,179 @@ class AnnotationWindow(QMainWindow):
         self.single_groups: dict[str, QButtonGroup] = {}
         self.multi_groups: dict[str, list[QCheckBox]] = {}
         self.question_labels: dict[str, str] = {}
-        self.question_types: dict[str, str] = {}
         self.preview_cache = "{}"
-
+        self.current_theme = "light"
+        self.shadow_targets: list[QWidget] = []
         self.is_slider_pressed = False
 
         self._build_ui()
         self._connect_player_signals()
+        self.apply_theme()
         self.update_summary()
 
     def _build_ui(self) -> None:
-        root = QWidget()
-        self.setCentralWidget(root)
-        main_layout = QVBoxLayout(root)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(8)
+        self.root = QWidget()
+        self.root.setObjectName("appRoot")
+        self.setCentralWidget(self.root)
 
+        main_layout = QVBoxLayout(self.root)
+        main_layout.setContentsMargins(18, 18, 18, 18)
+        main_layout.setSpacing(14)
+
+        hero_card, hero_layout = self.create_glass_card("heroCard", 20, 18, 20, 18)
+        hero_row = QHBoxLayout()
+        hero_row.setSpacing(16)
+
+        hero_text = QVBoxLayout()
+        hero_text.setSpacing(6)
+
+        app_title = QLabel("语音标注软件")
+        app_title.setObjectName("appTitle")
+        app_subtitle = QLabel("清晰、轻快、适合连续标注的桌面工作台。")
+        app_subtitle.setObjectName("appSubtitle")
         self.audio_name_label = QLabel("当前音频：未加载")
-        self.audio_name_label.setAlignment(Qt.AlignCenter)
-        self.audio_name_label.setStyleSheet(
-            "font-size: 20px; font-weight: 700; padding: 8px; background: #f5f7fb; border-radius: 8px;"
-        )
+        self.audio_name_label.setObjectName("audioNameLabel")
+
+        hero_text.addWidget(app_title)
+        hero_text.addWidget(app_subtitle)
+        hero_text.addWidget(self.audio_name_label)
+        hero_text.addStretch()
+
+        hero_actions = QHBoxLayout()
+        hero_actions.setSpacing(10)
+        hero_actions.addStretch()
+
+        self.theme_button = QPushButton("切换夜间")
+        self.theme_button.setCheckable(True)
+        self.theme_button.setProperty("variant", "secondary")
+        self.theme_button.setMinimumHeight(44)
+        self.theme_button.setMinimumWidth(146)
+        self.theme_button.clicked.connect(self.toggle_theme)
 
         self.open_folder_button = QPushButton("打开音频文件夹")
+        self.open_folder_button.setProperty("variant", "secondary")
+        self.open_folder_button.setMinimumHeight(44)
+        self.open_folder_button.setMinimumWidth(164)
         self.open_folder_button.clicked.connect(self.choose_audio_folder)
-        self.open_folder_button.setMinimumHeight(34)
 
-        title_layout = QHBoxLayout()
-        title_layout.setSpacing(8)
-        title_layout.addWidget(self.audio_name_label, 1)
-        title_layout.addWidget(self.open_folder_button)
-        main_layout.addLayout(title_layout)
+        hero_actions.addWidget(self.theme_button)
+        hero_actions.addWidget(self.open_folder_button)
+
+        hero_row.addLayout(hero_text, 1)
+        hero_row.addLayout(hero_actions)
+        hero_layout.addLayout(hero_row)
+        main_layout.addWidget(hero_card)
+
+        progress_card, progress_layout = self.create_glass_card("panelCard", 16, 16, 16, 16)
+        progress_header = QHBoxLayout()
+        progress_header.setSpacing(12)
+
+        progress_title = QLabel("播放进度")
+        progress_title.setObjectName("sectionTitle")
+        self.time_label = QLabel("00:00 / 00:00")
+        self.time_label.setObjectName("timeLabel")
+
+        progress_header.addWidget(progress_title)
+        progress_header.addStretch()
+        progress_header.addWidget(self.time_label)
 
         self.progress_slider = QSlider(Qt.Horizontal)
+        self.progress_slider.setObjectName("progressSlider")
         self.progress_slider.setRange(0, 0)
         self.progress_slider.sliderPressed.connect(self._on_slider_pressed)
         self.progress_slider.sliderReleased.connect(self._on_slider_released)
 
-        self.time_label = QLabel("00:00 / 00:00")
-        self.time_label.setAlignment(Qt.AlignRight)
-        self.time_label.setStyleSheet("font-size: 12px; color: #666;")
-
-        progress_layout = QVBoxLayout()
-        progress_layout.setSpacing(4)
+        progress_layout.addLayout(progress_header)
         progress_layout.addWidget(self.progress_slider)
-        progress_layout.addWidget(self.time_label)
-        main_layout.addLayout(progress_layout)
+        main_layout.addWidget(progress_card)
 
-        control_layout = QHBoxLayout()
-        control_layout.setSpacing(10)
+        control_card, control_layout = self.create_glass_card("panelCard", 12, 14, 12, 14)
+        controls = QHBoxLayout()
+        controls.setSpacing(14)
+        controls.addStretch()
 
         self.prev_button = QPushButton("上一条")
+        self.prev_button.setProperty("variant", "secondary")
         self.prev_button.clicked.connect(self.play_previous)
+
         self.play_button = QPushButton("继续播放")
+        self.play_button.setProperty("variant", "primary")
         self.play_button.clicked.connect(self.resume_playback)
+
         self.pause_button = QPushButton("暂停")
+        self.pause_button.setProperty("variant", "secondary")
         self.pause_button.clicked.connect(self.pause_playback)
+
         self.next_button = QPushButton("下一条")
+        self.next_button.setProperty("variant", "secondary")
         self.next_button.clicked.connect(self.play_next)
 
-        control_layout.addStretch()
-        control_layout.addWidget(self.prev_button)
-        control_layout.addWidget(self.play_button)
-        control_layout.addWidget(self.pause_button)
-        control_layout.addWidget(self.next_button)
-        control_layout.addStretch()
-        main_layout.addLayout(control_layout)
+        for button in (self.prev_button, self.play_button, self.pause_button, self.next_button):
+            button.setMinimumHeight(44)
+            button.setMinimumWidth(130)
+            controls.addWidget(button)
+
+        controls.addStretch()
+        control_layout.addLayout(controls)
+        main_layout.addWidget(control_card)
+
+        questions_shell, questions_shell_layout = self.create_glass_card("panelCard", 16, 16, 16, 16)
+        questions_title = QLabel("标注维度")
+        questions_title.setObjectName("sectionTitle")
+        questions_shell_layout.addWidget(questions_title)
 
         questions_panel = QWidget()
+        questions_panel.setObjectName("questionsPanel")
         self.questions_layout = QHBoxLayout(questions_panel)
-        self.questions_layout.setContentsMargins(2, 2, 2, 2)
-        self.questions_layout.setSpacing(8)
+        self.questions_layout.setContentsMargins(0, 0, 0, 0)
+        self.questions_layout.setSpacing(12)
         self._build_question_groups()
-        main_layout.addWidget(questions_panel, 1)
 
+        questions_shell_layout.addWidget(questions_panel, 1)
+        main_layout.addWidget(questions_shell, 1)
+
+        remark_card, remark_layout = self.create_glass_card("panelCard", 16, 16, 16, 16)
         remark_title = QLabel("描述音频")
-        remark_title.setStyleSheet("font-size: 18px; font-weight: 700;")
+        remark_title.setObjectName("sectionTitle")
         self.remark_edit = QPlainTextEdit()
+        self.remark_edit.setObjectName("remarkEdit")
         self.remark_edit.setPlaceholderText("简要描述这段音频的内容、场景或特殊情况。")
         self.remark_edit.textChanged.connect(self.update_summary)
-        self.remark_edit.setFixedHeight(58)
-        self.remark_edit.setStyleSheet("font-size: 13px; padding: 6px 8px;")
-        main_layout.addWidget(remark_title)
-        main_layout.addWidget(self.remark_edit, 0)
+        self.remark_edit.setFixedHeight(60)
 
-        bottom_layout = QHBoxLayout()
-        bottom_layout.setSpacing(12)
+        remark_layout.addWidget(remark_title)
+        remark_layout.addWidget(self.remark_edit)
+        main_layout.addWidget(remark_card)
+
+        action_card, action_layout = self.create_glass_card("panelCard", 12, 16, 12, 16)
+        actions = QHBoxLayout()
+        actions.setSpacing(12)
+        actions.addStretch()
 
         self.preview_button = QPushButton("预览 JSON")
+        self.preview_button.setProperty("variant", "secondary")
+        self.preview_button.setMinimumHeight(54)
+        self.preview_button.setMinimumWidth(190)
         self.preview_button.clicked.connect(self.show_preview_dialog)
+
         self.reset_button = QPushButton("重做")
+        self.reset_button.setProperty("variant", "secondary")
+        self.reset_button.setMinimumHeight(54)
+        self.reset_button.setMinimumWidth(190)
         self.reset_button.clicked.connect(self.reset_current_annotation)
-        self.reset_button.setMinimumHeight(52)
-        self.reset_button.setMinimumWidth(180)
-        self.reset_button.setStyleSheet("font-size: 16px; font-weight: 700;")
+
         self.submit_button = QPushButton("提交")
+        self.submit_button.setProperty("variant", "primary")
+        self.submit_button.setMinimumHeight(54)
+        self.submit_button.setMinimumWidth(230)
         self.submit_button.clicked.connect(self.submit_annotation)
-        self.submit_button.setMinimumHeight(52)
-        self.submit_button.setMinimumWidth(220)
-        self.submit_button.setStyleSheet(
-            "background: #1f6feb; color: white; font-size: 16px; font-weight: 700; padding: 10px 30px;"
-        )
-        self.preview_button.setMinimumHeight(52)
-        self.preview_button.setMinimumWidth(180)
-        self.preview_button.setStyleSheet("font-size: 16px; font-weight: 700;")
 
-        bottom_layout.addStretch()
-        bottom_layout.addWidget(self.preview_button)
-        bottom_layout.addWidget(self.reset_button)
-        bottom_layout.addWidget(self.submit_button)
-        bottom_layout.addStretch()
-        main_layout.addLayout(bottom_layout)
-
-        open_folder_action = QAction("打开音频文件夹", self)
-        open_folder_action.triggered.connect(self.choose_audio_folder)
-        self.menuBar().addAction(open_folder_action)
+        actions.addWidget(self.preview_button)
+        actions.addWidget(self.reset_button)
+        actions.addWidget(self.submit_button)
+        actions.addStretch()
+        action_layout.addLayout(actions)
+        main_layout.addWidget(action_card)
 
     def _build_question_groups(self) -> None:
         questions = [question for section in QUESTION_SECTIONS for question in section["questions"]]
@@ -193,27 +293,20 @@ class AnnotationWindow(QMainWindow):
 
         for _ in range(3):
             column = QVBoxLayout()
-            column.setSpacing(8)
+            column.setSpacing(12)
             column.setContentsMargins(0, 0, 0, 0)
             column_layouts.append(column)
             self.questions_layout.addLayout(column, 1)
 
         for index, question in enumerate(questions):
             self.question_labels[question["key"]] = question["label"]
-            self.question_types[question["key"]] = question["type"]
 
-            card = QFrame()
-            card.setFrameShape(QFrame.StyledPanel)
-            card.setStyleSheet(
-                "QFrame { background: white; border: 1px solid #d9dee7; border-radius: 10px; }"
-            )
-            card_layout = QVBoxLayout(card)
-            card_layout.setContentsMargins(12, 10, 12, 10)
-            card_layout.setSpacing(4)
+            card, card_layout = self.create_glass_card("questionCard", 14, 14, 14, 14)
+            card_layout.setSpacing(8)
 
             label = QLabel(f"{question['label']}  ({question['key']})")
+            label.setObjectName("questionTitle")
             label.setWordWrap(True)
-            label.setStyleSheet("font-size: 14px; font-weight: 700;")
             card_layout.addWidget(label)
 
             if question["type"] == "single":
@@ -223,7 +316,7 @@ class AnnotationWindow(QMainWindow):
                 for option in question["options"]:
                     button = QRadioButton(f"{option['label']}  [{option['value']}]")
                     button.setProperty("value", option["value"])
-                    button.setStyleSheet("font-size: 11px; padding-top: 1px; padding-bottom: 1px;")
+                    button.setObjectName("optionButton")
                     button.toggled.connect(self.update_summary)
                     group.addButton(button)
                     card_layout.addWidget(button)
@@ -233,7 +326,7 @@ class AnnotationWindow(QMainWindow):
                 for option in question["options"]:
                     checkbox = QCheckBox(f"{option['label']}  [{option['value']}]")
                     checkbox.setProperty("value", option["value"])
-                    checkbox.setStyleSheet("font-size: 11px; padding-top: 1px; padding-bottom: 1px;")
+                    checkbox.setObjectName("optionButton")
                     checkbox.stateChanged.connect(self.update_summary)
                     checkboxes.append(checkbox)
                     card_layout.addWidget(checkbox)
@@ -360,16 +453,19 @@ class AnnotationWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("JSON 预览")
         dialog.resize(700, 620)
+        dialog.setStyleSheet(self.dialog_stylesheet())
 
         layout = QVBoxLayout(dialog)
         preview = QPlainTextEdit()
+        preview.setObjectName("jsonPreview")
         preview.setReadOnly(True)
         preview.setPlainText(self.preview_cache)
-        preview.setStyleSheet("font-family: Menlo, Monaco, monospace; font-size: 13px;")
         layout.addWidget(preview)
 
         close_button = QPushButton("关闭")
+        close_button.setProperty("variant", "primary")
         close_button.clicked.connect(dialog.accept)
+
         button_row = QHBoxLayout()
         button_row.addStretch()
         button_row.addWidget(close_button)
@@ -434,6 +530,193 @@ class AnnotationWindow(QMainWindow):
 
         json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         QMessageBox.information(self, "提交成功", f"已生成：{json_path}")
+
+    def toggle_theme(self) -> None:
+        self.current_theme = "dark" if self.theme_button.isChecked() else "light"
+        self.theme_button.setText("切换日间" if self.current_theme == "dark" else "切换夜间")
+        self.apply_theme()
+
+    def create_glass_card(
+        self,
+        object_name: str,
+        left: int = 16,
+        top: int = 16,
+        right: int = 16,
+        bottom: int = 16,
+    ) -> tuple[QFrame, QVBoxLayout]:
+        frame = QFrame()
+        frame.setObjectName(object_name)
+        frame.setFrameShape(QFrame.StyledPanel)
+
+        layout = QVBoxLayout(frame)
+        layout.setContentsMargins(left, top, right, bottom)
+        layout.setSpacing(10)
+
+        self.attach_shadow(frame)
+        return frame, layout
+
+    def attach_shadow(self, widget: QWidget) -> None:
+        effect = QGraphicsDropShadowEffect(self)
+        effect.setBlurRadius(36)
+        effect.setOffset(0, 16)
+        widget.setGraphicsEffect(effect)
+        self.shadow_targets.append(widget)
+
+    def apply_theme(self) -> None:
+        theme = THEMES[self.current_theme]
+        for widget in self.shadow_targets:
+            effect = widget.graphicsEffect()
+            if isinstance(effect, QGraphicsDropShadowEffect):
+                shadow_color = QColor(theme["shadow"])
+                shadow_color.setAlpha(theme["shadow_alpha"])
+                effect.setColor(shadow_color)
+
+        self.setStyleSheet(self.build_stylesheet(theme))
+
+    def build_stylesheet(self, theme: dict[str, str | int]) -> str:
+        return f"""
+            QWidget#appRoot {{
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 {theme["window_start"]},
+                    stop: 1 {theme["window_end"]}
+                );
+                color: {theme["text_primary"]};
+            }}
+            QFrame#heroCard {{
+                background: {theme["panel_bg"]};
+                border: 1px solid {theme["card_border"]};
+                border-radius: 24px;
+            }}
+            QFrame#panelCard {{
+                background: {theme["panel_alt_bg"]};
+                border: 1px solid {theme["card_border"]};
+                border-radius: 20px;
+            }}
+            QFrame#questionCard {{
+                background: {theme["card_bg"]};
+                border: 1px solid {theme["card_border"]};
+                border-radius: 18px;
+            }}
+            QLabel#appTitle {{
+                font-size: 28px;
+                font-weight: 800;
+                color: {theme["text_primary"]};
+            }}
+            QLabel#appSubtitle {{
+                font-size: 13px;
+                color: {theme["text_muted"]};
+            }}
+            QLabel#audioNameLabel {{
+                font-size: 22px;
+                font-weight: 700;
+                color: {theme["text_primary"]};
+                padding-top: 6px;
+            }}
+            QLabel#sectionTitle {{
+                font-size: 17px;
+                font-weight: 700;
+                color: {theme["text_primary"]};
+            }}
+            QLabel#timeLabel {{
+                font-size: 13px;
+                font-weight: 600;
+                color: {theme["text_muted"]};
+            }}
+            QLabel#questionTitle {{
+                font-size: 14px;
+                font-weight: 700;
+                color: {theme["text_primary"]};
+                padding-bottom: 4px;
+            }}
+            QPlainTextEdit#remarkEdit,
+            QPlainTextEdit#jsonPreview {{
+                background: {theme["input_bg"]};
+                color: {theme["text_primary"]};
+                border: 1px solid {theme["input_border"]};
+                border-radius: 14px;
+                padding: 8px 10px;
+                font-size: 13px;
+            }}
+            QPlainTextEdit#jsonPreview {{
+                font-family: Menlo, Monaco, monospace;
+            }}
+            QPushButton {{
+                border-radius: 14px;
+                border: none;
+                padding: 10px 22px;
+                font-size: 15px;
+                font-weight: 700;
+            }}
+            QPushButton[variant="primary"] {{
+                background: {theme["accent"]};
+                color: white;
+            }}
+            QPushButton[variant="primary"]:hover {{
+                background: {theme["accent_hover"]};
+            }}
+            QPushButton[variant="secondary"] {{
+                background: {theme["secondary_bg"]};
+                color: {theme["text_primary"]};
+                border: 1px solid {theme["card_border"]};
+            }}
+            QPushButton[variant="secondary"]:hover {{
+                background: {theme["secondary_hover"]};
+            }}
+            QRadioButton#optionButton,
+            QCheckBox#optionButton {{
+                color: {theme["text_primary"]};
+                font-size: 12px;
+                spacing: 10px;
+                padding-top: 2px;
+                padding-bottom: 2px;
+            }}
+            QSlider#progressSlider::groove:horizontal {{
+                height: 10px;
+                background: {theme["slider_groove"]};
+                border-radius: 5px;
+            }}
+            QSlider#progressSlider::sub-page:horizontal {{
+                background: {theme["accent"]};
+                border-radius: 5px;
+            }}
+            QSlider#progressSlider::handle:horizontal {{
+                background: white;
+                width: 20px;
+                margin: -6px 0;
+                border-radius: 10px;
+                border: 2px solid {theme["accent"]};
+            }}
+        """
+
+    def dialog_stylesheet(self) -> str:
+        theme = THEMES[self.current_theme]
+        return f"""
+            QDialog {{
+                background: {theme["panel_bg"]};
+                color: {theme["text_primary"]};
+            }}
+            QPlainTextEdit#jsonPreview {{
+                background: {theme["input_bg"]};
+                color: {theme["text_primary"]};
+                border: 1px solid {theme["input_border"]};
+                border-radius: 14px;
+                padding: 8px 10px;
+                font-size: 13px;
+                font-family: Menlo, Monaco, monospace;
+            }}
+            QPushButton {{
+                border-radius: 12px;
+                border: none;
+                padding: 10px 20px;
+                font-size: 14px;
+                font-weight: 700;
+            }}
+            QPushButton[variant="primary"] {{
+                background: {theme["accent"]};
+                color: white;
+            }}
+        """
 
 
 def main() -> None:
