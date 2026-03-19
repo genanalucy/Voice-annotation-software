@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -98,23 +99,9 @@ def format_ms(ms: int) -> str:
 
 def normalize_audio_key(name: str) -> str:
     normalized = Path(str(name).strip()).stem.strip().lower()
-    suffixes = [
-        "-副本",
-        "副本",
-        "_副本",
-        " copy",
-        "_copy",
-        "-copy",
-        "（副本）",
-        "(副本)",
-    ]
-    changed = True
-    while changed and normalized:
-        changed = False
-        for suffix in suffixes:
-            if normalized.endswith(suffix):
-                normalized = normalized[: -len(suffix)].rstrip(" _-")
-                changed = True
+    match = re.search(r"([a-z0-9]+-\d+)", normalized)
+    if match:
+        return match.group(1)
     return normalized
 
 
