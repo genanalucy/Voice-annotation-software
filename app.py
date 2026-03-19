@@ -4,9 +4,9 @@ import json
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QSignalBlocker, Qt, QUrl
-from PySide6.QtGui import QColor
-from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+from PySide6.QtCore import QSignalBlocker, Qt, QUrl, Signal
+from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
+from PySide6.QtMultimedia import QAudioBuffer, QAudioDecoder, QAudioFormat, QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
     QButtonGroup,
@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QRadioButton,
     QScrollArea,
-    QSlider,
     QSizePolicy,
     QVBoxLayout,
     QWidget,
@@ -95,6 +94,104 @@ def format_ms(ms: int) -> str:
     return f"{minute:02d}:{second:02d}"
 
 
+class WaveformSeekBar(QWidget):
+    seekRequested = Signal(float)
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setMinimumHeight(74)
+        self.setCursor(Qt.PointingHandCursor)
+        self.waveform_points: list[tuple[float, float]] = []
+        self.progress_ratio = 0.0
+        self.dragging = False
+        self.colors = {
+            "background": QColor("#dbe5f4"),
+            "played": QColor("#1f6feb"),
+            "upcoming": QColor("#8ba5cd"),
+            "line": QColor("#ffffff"),
+        }
+
+    def set_waveform(self, points: list[tuple[float, float]]) -> None:
+        self.waveform_points = points or [(-0.18, 0.18)] * 180
+        self.update()
+
+    def set_progress(self, position_ms: int, duration_ms: int) -> None:
+        if duration_ms <= 0:
+            self.progress_ratio = 0.0
+        else:
+            self.progress_ratio = max(0.0, min(1.0, position_ms / duration_ms))
+        if not self.dragging:
+            self.update()
+
+    def set_theme(self, *, background: str, played: str, upcoming: str, line: str) -> None:
+        self.colors = {
+            "background": QColor(background),
+            "played": QColor(played),
+            "upcoming": QColor(upcoming),
+            "line": QColor(line),
+        }
+        self.update()
+
+    def mousePressEvent(self, event) -> None:  # type: ignore[override]
+        if event.button() == Qt.LeftButton:
+            self.dragging = True
+            self._emit_seek(event.position().x())
+
+    def mouseMoveEvent(self, event) -> None:  # type: ignore[override]
+        if self.dragging:
+            self._emit_seek(event.position().x())
+
+    def mouseReleaseEvent(self, event) -> None:  # type: ignore[override]
+        if event.button() == Qt.LeftButton:
+            self.dragging = False
+            self._emit_seek(event.position().x())
+
+    def paintEvent(self, event) -> None:  # type: ignore[override]
+        del event
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        rect = self.rect().adjusted(0, 6, 0, -6)
+        path = QPainterPath()
+        path.addRoundedRect(rect, 16, 16)
+        painter.fillPath(path, self.colors["background"])
+
+        points = self.waveform_points or [(-0.18, 0.18)] * 180
+        count = len(points)
+        if count == 0:
+            return
+
+        bar_width = max(2.0, rect.width() / max(count * 1.9, 1))
+        step = rect.width() / count
+        center_y = rect.center().y()
+        progress_x = rect.left() + rect.width() * self.progress_ratio
+
+        played_pen = QPen(self.colors["played"], bar_width, Qt.SolidLine, Qt.RoundCap)
+        upcoming_pen = QPen(self.colors["upcoming"], bar_width, Qt.SolidLine, Qt.RoundCap)
+
+        for index, (min_value, max_value) in enumerate(points):
+            x = rect.left() + (index + 0.5) * step
+            clamped_min = max(-1.0, min(1.0, min_value))
+            clamped_max = max(-1.0, min(1.0, max_value))
+            y_top = center_y - clamped_max * (rect.height() / 2 - 6)
+            y_bottom = center_y - clamped_min * (rect.height() / 2 - 6)
+            if abs(y_bottom - y_top) < 4:
+                y_top = center_y - 2
+                y_bottom = center_y + 2
+            painter.setPen(played_pen if x <= progress_x else upcoming_pen)
+            painter.drawLine(x, y_top, x, y_bottom)
+
+        painter.setPen(QPen(self.colors["line"], 2))
+        painter.drawLine(progress_x, rect.top() + 2, progress_x, rect.bottom() - 2)
+
+    def _emit_seek(self, x: float) -> None:
+        width = max(1, self.width())
+        ratio = max(0.0, min(1.0, x / width))
+        self.progress_ratio = ratio
+        self.update()
+        self.seekRequested.emit(ratio)
+
+
 class AnnotationWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
@@ -118,7 +215,9 @@ class AnnotationWindow(QMainWindow):
         self.preview_cache = "{}"
         self.current_theme = "light"
         self.shadow_targets: list[QWidget] = []
-        self.is_slider_pressed = False
+        self.waveform_decoder: QAudioDecoder | None = None
+        self.waveform_decode_path: Path | None = None
+        self.waveform_samples: list[float] = []
 
         self._build_ui()
         self._connect_player_signals()
@@ -206,14 +305,11 @@ class AnnotationWindow(QMainWindow):
         progress_header.addStretch()
         progress_header.addWidget(self.time_label)
 
-        self.progress_slider = QSlider(Qt.Horizontal)
-        self.progress_slider.setObjectName("progressSlider")
-        self.progress_slider.setRange(0, 0)
-        self.progress_slider.sliderPressed.connect(self._on_slider_pressed)
-        self.progress_slider.sliderReleased.connect(self._on_slider_released)
+        self.waveform_bar = WaveformSeekBar()
+        self.waveform_bar.seekRequested.connect(self._on_waveform_seek)
 
         progress_layout.addLayout(progress_header)
-        progress_layout.addWidget(self.progress_slider)
+        progress_layout.addWidget(self.waveform_bar)
         main_layout.addWidget(progress_card)
 
         control_card, control_layout = self.create_glass_card("panelCard", 12, 14, 12, 14)
@@ -386,7 +482,8 @@ class AnnotationWindow(QMainWindow):
         audio_path = self.audio_files[self.audio_index]
         self.audio_name_label.setText(f"当前音频：{audio_path.name}")
         self.player.setSource(QUrl.fromLocalFile(str(audio_path)))
-        self.progress_slider.setValue(0)
+        self.waveform_bar.set_progress(0, 0)
+        self.start_waveform_decode(audio_path)
         self.time_label.setText("00:00 / 00:00")
         self.load_existing_annotation()
         self.update_summary()
@@ -417,27 +514,24 @@ class AnnotationWindow(QMainWindow):
             return
         self.player.play()
 
-    def _on_slider_pressed(self) -> None:
-        self.is_slider_pressed = True
-
-    def _on_slider_released(self) -> None:
-        self.is_slider_pressed = False
-        self.player.setPosition(self.progress_slider.value())
+    def _on_waveform_seek(self, ratio: float) -> None:
+        duration = self.player.duration()
+        if duration > 0:
+            self.player.setPosition(int(duration * ratio))
 
     def _sync_position(self, position: int) -> None:
-        if not self.is_slider_pressed:
-            self.progress_slider.setValue(position)
+        self.waveform_bar.set_progress(position, self.player.duration())
         self.time_label.setText(f"{format_ms(position)} / {format_ms(self.player.duration())}")
 
     def _sync_duration(self, duration: int) -> None:
-        self.progress_slider.setRange(0, duration)
+        self.waveform_bar.set_progress(self.player.position(), duration)
         self.time_label.setText(f"{format_ms(self.player.position())} / {format_ms(duration)}")
 
     def _on_media_status_changed(self, status: QMediaPlayer.MediaStatus) -> None:
         if status == QMediaPlayer.EndOfMedia:
             self.player.pause()
             self.player.setPosition(0)
-            self.progress_slider.setValue(0)
+            self.waveform_bar.set_progress(0, self.player.duration())
             self.time_label.setText(f"00:00 / {format_ms(self.player.duration())}")
 
     def current_audio_path(self) -> Path | None:
@@ -592,7 +686,104 @@ class AnnotationWindow(QMainWindow):
                 shadow_color.setAlpha(theme["shadow_alpha"])
                 effect.setColor(shadow_color)
 
+        self.waveform_bar.set_theme(
+            background=theme["slider_groove"],
+            played=theme["accent"],
+            upcoming=theme["text_muted"],
+            line=theme["card_bg"],
+        )
         self.setStyleSheet(self.build_stylesheet(theme))
+
+    def start_waveform_decode(self, audio_path: Path) -> None:
+        self.waveform_decode_path = audio_path
+        self.waveform_samples = []
+        self.waveform_bar.set_waveform([(-0.12, 0.12)] * 180)
+
+        if self.waveform_decoder is not None:
+            try:
+                self.waveform_decoder.stop()
+            except RuntimeError:
+                pass
+
+        decoder = QAudioDecoder(self)
+        self.waveform_decoder = decoder
+        decoder.setSource(QUrl.fromLocalFile(str(audio_path)))
+        decoder.bufferReady.connect(self._on_waveform_buffer_ready)
+        decoder.finished.connect(self._on_waveform_decode_finished)
+        decoder.start()
+
+    def _on_waveform_buffer_ready(self) -> None:
+        if self.waveform_decoder is None:
+            return
+        buffer = self.waveform_decoder.read()
+        if not buffer.isValid():
+            return
+        self.waveform_samples.extend(self.extract_buffer_samples(buffer))
+
+    def _on_waveform_decode_finished(self) -> None:
+        if not self.waveform_samples:
+            self.waveform_bar.set_waveform([(-0.12, 0.12)] * 180)
+            return
+        self.waveform_bar.set_waveform(self.compress_samples_to_waveform(self.waveform_samples, 220))
+
+    def extract_buffer_samples(self, buffer: QAudioBuffer) -> list[float]:
+        fmt = buffer.format()
+        channels = max(1, fmt.channelCount())
+        frames = buffer.frameCount()
+        if frames <= 0:
+            return []
+
+        samples = self.buffer_to_float_samples(buffer, fmt)
+        if not samples:
+            return []
+
+        mono_samples: list[float] = []
+        for frame_index in range(frames):
+            sample_start = frame_index * channels
+            frame_sum = 0.0
+            for channel_index in range(channels):
+                frame_sum += samples[sample_start + channel_index]
+            mono_samples.append(frame_sum / channels)
+        return mono_samples
+
+    def buffer_to_float_samples(self, buffer: QAudioBuffer, fmt: QAudioFormat) -> list[float]:
+        raw = buffer.data()
+        sample_format = fmt.sampleFormat()
+
+        if sample_format == QAudioFormat.SampleFormat.UInt8:
+            view = raw.cast("B")
+            return [(value - 128) / 128.0 for value in view]
+        if sample_format == QAudioFormat.SampleFormat.Int16:
+            view = raw.cast("h")
+            return [value / 32768.0 for value in view]
+        if sample_format == QAudioFormat.SampleFormat.Int32:
+            view = raw.cast("i")
+            return [value / 2147483648.0 for value in view]
+        if sample_format == QAudioFormat.SampleFormat.Float:
+            view = raw.cast("f")
+            return [float(value) for value in view]
+        return []
+
+    def compress_samples_to_waveform(
+        self, samples: list[float], target_count: int
+    ) -> list[tuple[float, float]]:
+        if not samples:
+            return [(-0.12, 0.12)] * target_count
+
+        total = len(samples)
+        points: list[tuple[float, float]] = []
+        for index in range(target_count):
+            start = int(index * total / target_count)
+            end = max(start + 1, int((index + 1) * total / target_count))
+            segment = samples[start:end]
+            seg_min = min(segment)
+            seg_max = max(segment)
+            if abs(seg_max - seg_min) < 0.04:
+                midpoint = (seg_max + seg_min) / 2
+                seg_min = midpoint - 0.02
+                seg_max = midpoint + 0.02
+            points.append((seg_min, seg_max))
+        return points
 
     def build_stylesheet(self, theme: dict[str, str | int]) -> str:
         return f"""
@@ -691,22 +882,6 @@ class AnnotationWindow(QMainWindow):
                 spacing: 10px;
                 padding-top: 2px;
                 padding-bottom: 2px;
-            }}
-            QSlider#progressSlider::groove:horizontal {{
-                height: 10px;
-                background: {theme["slider_groove"]};
-                border-radius: 5px;
-            }}
-            QSlider#progressSlider::sub-page:horizontal {{
-                background: {theme["accent"]};
-                border-radius: 5px;
-            }}
-            QSlider#progressSlider::handle:horizontal {{
-                background: white;
-                width: 20px;
-                margin: -6px 0;
-                border-radius: 10px;
-                border: 2px solid {theme["accent"]};
             }}
         """
 
