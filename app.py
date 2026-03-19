@@ -4,6 +4,7 @@ import json
 import sys
 from pathlib import Path
 
+from openpyxl import load_workbook
 from PySide6.QtCore import QSignalBlocker, Qt, QUrl
 from PySide6.QtGui import QAction
 from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
@@ -76,6 +77,7 @@ class AnnotationWindow(QMainWindow):
         self.question_configs: dict[str, dict] = {}
         self.required_question_keys: set[str] = set()
         self.multi_exclusive_values: dict[str, str] = {}
+        self.transcript_map: dict[str, dict[str, str]] = {}
         self.preview_cache = "{}"
 
         self.is_slider_pressed = False
@@ -100,12 +102,51 @@ class AnnotationWindow(QMainWindow):
         self.open_folder_button = QPushButton("打开音频文件夹")
         self.open_folder_button.clicked.connect(self.choose_audio_folder)
         self.open_folder_button.setMinimumHeight(34)
+        self.open_excel_button = QPushButton("导入 Excel")
+        self.open_excel_button.clicked.connect(self.choose_excel_file)
+        self.open_excel_button.setMinimumHeight(34)
 
         title_layout = QHBoxLayout()
         title_layout.setSpacing(8)
         title_layout.addWidget(self.audio_name_label, 1)
+        title_layout.addWidget(self.open_excel_button)
         title_layout.addWidget(self.open_folder_button)
         main_layout.addLayout(title_layout)
+
+        transcript_layout = QHBoxLayout()
+        transcript_layout.setSpacing(10)
+
+        source_layout = QVBoxLayout()
+        source_layout.setSpacing(4)
+        source_title = QLabel("原文")
+        source_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #111827;")
+        self.source_text = QPlainTextEdit()
+        self.source_text.setReadOnly(True)
+        self.source_text.setFixedHeight(72)
+        self.source_text.setPlaceholderText("导入 Excel 后显示对应录音的原文。")
+        self.source_text.setStyleSheet(
+            "font-size: 13px; color: #111827; background: #ffffff; border: 1px solid #d9dee7; border-radius: 8px; padding: 8px;"
+        )
+        source_layout.addWidget(source_title)
+        source_layout.addWidget(self.source_text)
+
+        translation_layout = QVBoxLayout()
+        translation_layout.setSpacing(4)
+        translation_title = QLabel("中文翻译")
+        translation_title.setStyleSheet("font-size: 14px; font-weight: 700; color: #111827;")
+        self.translation_text = QPlainTextEdit()
+        self.translation_text.setReadOnly(True)
+        self.translation_text.setFixedHeight(72)
+        self.translation_text.setPlaceholderText("导入 Excel 后显示对应录音的中文翻译。")
+        self.translation_text.setStyleSheet(
+            "font-size: 13px; color: #111827; background: #ffffff; border: 1px solid #d9dee7; border-radius: 8px; padding: 8px;"
+        )
+        translation_layout.addWidget(translation_title)
+        translation_layout.addWidget(self.translation_text)
+
+        transcript_layout.addLayout(source_layout, 1)
+        transcript_layout.addLayout(translation_layout, 1)
+        main_layout.addLayout(transcript_layout)
 
         self.progress_slider = QSlider(Qt.Horizontal)
         self.progress_slider.setRange(0, 0)
@@ -267,6 +308,46 @@ class AnnotationWindow(QMainWindow):
             return
         self.load_audio_folder(Path(directory))
 
+    def choose_excel_file(self) -> None:
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "选择 Excel 文件",
+            str(Path.cwd()),
+            "Excel Files (*.xlsx *.xlsm *.xltx *.xltm)",
+        )
+        if not file_path:
+            return
+        self.load_excel_mapping(Path(file_path))
+
+    def load_excel_mapping(self, excel_path: Path) -> None:
+        try:
+            workbook = load_workbook(excel_path, read_only=True, data_only=True)
+            worksheet = workbook.active
+        except Exception as exc:
+            QMessageBox.warning(self, "Excel 读取失败", f"无法读取 Excel：{exc}")
+            return
+
+        mapping: dict[str, dict[str, str]] = {}
+        for row_index, row in enumerate(worksheet.iter_rows(values_only=True), start=1):
+            if row_index == 1:
+                continue
+            if not row:
+                continue
+
+            audio_name = str(row[0]).strip() if len(row) > 0 and row[0] is not None else ""
+            source_text = str(row[1]).strip() if len(row) > 1 and row[1] is not None else ""
+            translation_text = str(row[2]).strip() if len(row) > 2 and row[2] is not None else ""
+            if not audio_name:
+                continue
+            mapping[audio_name] = {
+                "source": source_text,
+                "translation": translation_text,
+            }
+
+        self.transcript_map = mapping
+        self.update_transcript_display()
+        QMessageBox.information(self, "导入成功", f"已读取 {len(mapping)} 条文本映射。")
+
     def load_audio_folder(self, folder: Path) -> None:
         files = sorted(
             path for path in folder.iterdir() if path.is_file() and path.suffix.lower() in SUPPORTED_AUDIO_EXTENSIONS
@@ -289,6 +370,7 @@ class AnnotationWindow(QMainWindow):
         self.player.setSource(QUrl.fromLocalFile(str(audio_path)))
         self.progress_slider.setValue(0)
         self.time_label.setText("00:00 / 00:00")
+        self.update_transcript_display()
         self.load_existing_annotation()
         self.update_summary()
 
@@ -351,6 +433,17 @@ class AnnotationWindow(QMainWindow):
         if not audio_path:
             return None
         return self.json_dir / f"{audio_path.stem}.json"
+
+    def update_transcript_display(self) -> None:
+        audio_path = self.current_audio_path()
+        if not audio_path:
+            self.source_text.clear()
+            self.translation_text.clear()
+            return
+
+        record = self.transcript_map.get(audio_path.stem, {})
+        self.source_text.setPlainText(record.get("source", ""))
+        self.translation_text.setPlainText(record.get("translation", ""))
 
     def collect_annotation(self) -> dict:
         audio_path = self.current_audio_path()
