@@ -1,11 +1,117 @@
 QUESTION_SECTIONS = [
     {
-        "title": "模块一：环境与声学特征（提取物理特征 X1）",
+        "title": "第一阶",
         "questions": [
+            {
+                "key": "snr_feeling",
+                "label": "信噪比听感",
+                "type": "single",
+                "default": "Good",
+                "options": [
+                    {"label": "极好-人声极清晰", "value": "Excellent"},
+                    {"label": "良好-有底噪不影响", "value": "Good"},
+                    {"label": "较差-需仔细辨认", "value": "Poor"},
+                    {"label": "极差-无法听清", "value": "Terrible"},
+                ],
+            },
+            {
+                "key": "speaker_gender",
+                "label": "性别预估",
+                "type": "single",
+                "required": True,
+                "options": [
+                    {"label": "男", "value": "Male"},
+                    {"label": "女", "value": "Female"},
+                    {"label": "无法分辨", "value": "Unknown"},
+                ],
+            },
+            {
+                "key": "speech_style",
+                "label": "语言状态",
+                "type": "single",
+                "default": "Reading",
+                "options": [
+                    {"label": "机械朗读", "value": "Reading"},
+                    {"label": "自然闲聊", "value": "Conversational"},
+                    {"label": "情绪-高昂 (笑/激动/愤怒)", "value": "Emotional-High"},
+                    {"label": "情绪-低沉 (悲伤/叹气/疲惫)", "value": "Emotional-Low"},
+                ],
+            },
+            {
+                "key": "tone_quality",
+                "label": "壮语声调表现",
+                "type": "single",
+                "required": True,
+                "options": [
+                    {"label": "调值准确自然", "value": "Accurate"},
+                    {"label": "声调平淡/趋于机器味", "value": "Robotic-Flat"},
+                    {"label": "明显变调/不连贯", "value": "Distorted"},
+                ],
+            },
+            {
+                "key": "articulation",
+                "label": "发音清晰度",
+                "type": "single",
+                "default": "Clear",
+                "options": [
+                    {"label": "吐字清晰", "value": "Clear"},
+                    {"label": "略带口音", "value": "Accented"},
+                    {"label": "含糊吞音", "value": "Mumbled"},
+                ],
+            },
+            {
+                "key": "speech_speed",
+                "label": "发音语速",
+                "type": "single",
+                "default": "Normal",
+                "options": [
+                    {"label": "极快", "value": "Very-Fast"},
+                    {"label": "偏快", "value": "Fast"},
+                    {"label": "正常", "value": "Normal"},
+                    {"label": "偏慢-字正腔圆", "value": "Slow"},
+                    {"label": "极慢-字间拖沓/停顿长", "value": "Very-Slow-Dragging"},
+                ],
+            },
+            {
+                "key": "fluency",
+                "label": "流畅度",
+                "type": "single",
+                "default": "Fluent",
+                "options": [
+                    {"label": "流畅无结巴", "value": "Fluent"},
+                    {"label": "结巴/字词重复", "value": "Disfluency"},
+                    {"label": "明显嘴瓢/修正语", "value": "Self-Correction"},
+                ],
+            },
+            {
+                "key": "boundary_status",
+                "label": "边界完整度",
+                "type": "single",
+                "default": "Complete",
+                "options": [
+                    {"label": "完整无截断", "value": "Complete"},
+                    {"label": "头部轻微截断 (按太晚吞声母)", "value": "Head-Truncated"},
+                    {"label": "尾部轻微截断 (松太早吞尾音)", "value": "Tail-Truncated"},
+                ],
+            },
+            {
+                "key": "device_distort",
+                "label": "硬件失真",
+                "type": "multi",
+                "default": ["Normal"],
+                "exclusive_value": "Normal",
+                "options": [
+                    {"label": "正常", "value": "Normal"},
+                    {"label": "电流麦/炸麦", "value": "Electric"},
+                    {"label": "声音发闷-设备太远", "value": "Muffled"},
+                    {"label": "爆音截幅-电平过大", "value": "Clipping"},
+                ],
+            },
             {
                 "key": "scene_type",
                 "label": "录音场景",
                 "type": "single",
+                "default": "Indoor-Quiet",
                 "options": [
                     {"label": "录音棚/极静", "value": "Studio"},
                     {"label": "室内安静-寝室/办公室", "value": "Indoor-Quiet"},
@@ -15,9 +121,22 @@ QUESTION_SECTIONS = [
                 ],
             },
             {
+                "key": "reverb_level",
+                "label": "混响程度",
+                "type": "single",
+                "default": "Slight",
+                "options": [
+                    {"label": "无明显混响-干音", "value": "Dry"},
+                    {"label": "轻微混响-普通房间", "value": "Slight"},
+                    {"label": "严重混响-空旷大厅", "value": "Severe"},
+                ],
+            },
+            {
                 "key": "noise_type",
                 "label": "噪声类型",
                 "type": "multi",
+                "default": ["None"],
+                "exclusive_value": "None",
                 "options": [
                     {"label": "无明显噪声", "value": "None"},
                     {"label": "持续底噪-风扇/电流", "value": "Continuous"},
@@ -26,86 +145,8 @@ QUESTION_SECTIONS = [
                     {"label": "自然风噪", "value": "Wind"},
                 ],
             },
-            {
-                "key": "reverb_level",
-                "label": "混响程度",
-                "type": "single",
-                "options": [
-                    {"label": "无明显混响-干音", "value": "Dry"},
-                    {"label": "轻微混响-普通房间", "value": "Slight"},
-                    {"label": "严重混响-空旷大厅", "value": "Severe"},
-                ],
-            },
-            {
-                "key": "device_distort",
-                "label": "硬件失真",
-                "type": "multi",
-                "options": [
-                    {"label": "正常", "value": "Normal"},
-                    {"label": "电流麦/炸麦", "value": "Electric"},
-                    {"label": "声音发闷-设备太远", "value": "Muffled"},
-                    {"label": "爆音截幅-电平过大", "value": "Clipping"},
-                ],
-            },
-            {
-                "key": "snr_feeling",
-                "label": "信噪比听感",
-                "type": "single",
-                "options": [
-                    {"label": "极好-人声极清晰", "value": "Excellent"},
-                    {"label": "良好-有底噪不影响", "value": "Good"},
-                    {"label": "较差-需仔细辨认", "value": "Poor"},
-                    {"label": "极差-无法听清", "value": "Terrible"},
-                ],
-            },
         ],
-    },
-    {
-        "title": "模块二：说话人与语言状态（提取语义/风格特征 X2）",
-        "questions": [
-            {
-                "key": "speaker_gender",
-                "label": "性别预估",
-                "type": "single",
-                "options": [
-                    {"label": "男", "value": "Male"},
-                    {"label": "女", "value": "Female"},
-                    {"label": "无法分辨", "value": "Unknown"},
-                ],
-            },
-            {
-                "key": "speech_speed",
-                "label": "发音语速",
-                "type": "single",
-                "options": [
-                    {"label": "极快", "value": "Very-Fast"},
-                    {"label": "偏快", "value": "Fast"},
-                    {"label": "正常", "value": "Normal"},
-                    {"label": "偏慢/字正腔圆", "value": "Slow"},
-                ],
-            },
-            {
-                "key": "articulation",
-                "label": "发音清晰度",
-                "type": "single",
-                "options": [
-                    {"label": "吐字清晰", "value": "Clear"},
-                    {"label": "略带口音", "value": "Accented"},
-                    {"label": "含糊吞音", "value": "Mumbled"},
-                ],
-            },
-            {
-                "key": "speech_style",
-                "label": "语言状态",
-                "type": "single",
-                "options": [
-                    {"label": "机械朗读/生硬", "value": "Reading"},
-                    {"label": "自然对话/闲聊", "value": "Conversational"},
-                    {"label": "带情绪-笑/激动", "value": "Emotional"},
-                ],
-            },
-        ],
-    },
+    }
 ]
 
 REMARK_KEY = "audio_description"
