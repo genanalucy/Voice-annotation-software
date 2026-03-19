@@ -96,6 +96,28 @@ def format_ms(ms: int) -> str:
     return f"{minute:02d}:{second:02d}"
 
 
+def normalize_audio_key(name: str) -> str:
+    normalized = Path(str(name).strip()).stem.strip().lower()
+    suffixes = [
+        "-副本",
+        "副本",
+        "_副本",
+        " copy",
+        "_copy",
+        "-copy",
+        "（副本）",
+        "(副本)",
+    ]
+    changed = True
+    while changed and normalized:
+        changed = False
+        for suffix in suffixes:
+            if normalized.endswith(suffix):
+                normalized = normalized[: -len(suffix)].rstrip(" _-")
+                changed = True
+    return normalized
+
+
 class WaveformSeekBar(QWidget):
     seekRequested = Signal(float)
 
@@ -538,7 +560,7 @@ class AnnotationWindow(QMainWindow):
             translation_text = str(row[2]).strip() if len(row) > 2 and row[2] is not None else ""
             if not audio_name:
                 continue
-            mapping[audio_name] = {
+            mapping[normalize_audio_key(audio_name)] = {
                 "source": source_text,
                 "translation": translation_text,
             }
@@ -638,7 +660,7 @@ class AnnotationWindow(QMainWindow):
             self.translation_text.clear()
             return
 
-        record = self.transcript_map.get(audio_path.stem, {})
+        record = self.transcript_map.get(normalize_audio_key(audio_path.name), {})
         self.source_text.setPlainText(record.get("source", ""))
         self.translation_text.setPlainText(record.get("translation", ""))
 
