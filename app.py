@@ -946,6 +946,7 @@ class AnnotationWindow(QMainWindow):
             QRadioButton#optionButton,
             QCheckBox#optionButton {{
                 color: {theme["text_primary"]};
+                background: transparent;
                 font-size: 12px;
                 spacing: 10px;
                 padding-top: 2px;
