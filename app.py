@@ -94,7 +94,7 @@ class AnnotationWindow(QMainWindow):
         self.audio_name_label = QLabel("当前音频：未加载")
         self.audio_name_label.setAlignment(Qt.AlignCenter)
         self.audio_name_label.setStyleSheet(
-            "font-size: 20px; font-weight: 700; padding: 8px; background: #f5f7fb; border-radius: 8px;"
+            "font-size: 20px; font-weight: 700; color: #111827; padding: 8px; background: #f5f7fb; border-radius: 8px;"
         )
 
         self.open_folder_button = QPushButton("打开音频文件夹")
@@ -151,12 +151,14 @@ class AnnotationWindow(QMainWindow):
         main_layout.addWidget(questions_panel, 1)
 
         remark_title = QLabel("描述音频")
-        remark_title.setStyleSheet("font-size: 18px; font-weight: 700;")
+        remark_title.setStyleSheet("font-size: 18px; font-weight: 700; color: #f9fafb;")
         self.remark_edit = QPlainTextEdit()
         self.remark_edit.setPlaceholderText("简要描述这段音频的内容、场景或特殊情况。")
         self.remark_edit.textChanged.connect(self.update_summary)
         self.remark_edit.setFixedHeight(58)
-        self.remark_edit.setStyleSheet("font-size: 13px; padding: 6px 8px;")
+        self.remark_edit.setStyleSheet(
+            "font-size: 13px; color: #f9fafb; background: #111111; border: 1px solid #4b5563; padding: 6px 8px;"
+        )
         main_layout.addWidget(remark_title)
         main_layout.addWidget(self.remark_edit, 0)
         self.apply_default_selections()
@@ -216,7 +218,7 @@ class AnnotationWindow(QMainWindow):
 
             label = QLabel(f"{question['label']}  ({question['key']})")
             label.setWordWrap(True)
-            label.setStyleSheet("font-size: 14px; font-weight: 700;")
+            label.setStyleSheet("font-size: 14px; font-weight: 700; color: #111827;")
             card_layout.addWidget(label)
 
             if question["type"] == "single":
@@ -226,7 +228,9 @@ class AnnotationWindow(QMainWindow):
                 for option in question["options"]:
                     button = QRadioButton(f"{option['label']}  [{option['value']}]")
                     button.setProperty("value", option["value"])
-                    button.setStyleSheet("font-size: 11px; padding-top: 1px; padding-bottom: 1px;")
+                    button.setStyleSheet(
+                        "font-size: 11px; color: #111827; padding-top: 1px; padding-bottom: 1px;"
+                    )
                     button.toggled.connect(self.update_summary)
                     group.addButton(button)
                     card_layout.addWidget(button)
@@ -236,7 +240,9 @@ class AnnotationWindow(QMainWindow):
                 for option in question["options"]:
                     checkbox = QCheckBox(f"{option['label']}  [{option['value']}]")
                     checkbox.setProperty("value", option["value"])
-                    checkbox.setStyleSheet("font-size: 11px; padding-top: 1px; padding-bottom: 1px;")
+                    checkbox.setStyleSheet(
+                        "font-size: 11px; color: #111827; padding-top: 1px; padding-bottom: 1px;"
+                    )
                     checkbox.stateChanged.connect(
                         lambda _state, key=question["key"], box=checkbox: self._handle_multi_change(key, box)
                     )
