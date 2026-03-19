@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -72,6 +73,9 @@ class AnnotationWindow(QMainWindow):
         self.multi_groups: dict[str, list[QCheckBox]] = {}
         self.question_labels: dict[str, str] = {}
         self.question_types: dict[str, str] = {}
+        self.question_configs: dict[str, dict] = {}
+        self.required_question_keys: set[str] = set()
+        self.multi_exclusive_values: dict[str, str] = {}
         self.preview_cache = "{}"
 
         self.is_slider_pressed = False
@@ -139,9 +143,10 @@ class AnnotationWindow(QMainWindow):
         main_layout.addLayout(control_layout)
 
         questions_panel = QWidget()
-        self.questions_layout = QHBoxLayout(questions_panel)
+        self.questions_layout = QGridLayout(questions_panel)
         self.questions_layout.setContentsMargins(2, 2, 2, 2)
-        self.questions_layout.setSpacing(8)
+        self.questions_layout.setHorizontalSpacing(8)
+        self.questions_layout.setVerticalSpacing(8)
         self._build_question_groups()
         main_layout.addWidget(questions_panel, 1)
 
@@ -154,6 +159,7 @@ class AnnotationWindow(QMainWindow):
         self.remark_edit.setStyleSheet("font-size: 13px; padding: 6px 8px;")
         main_layout.addWidget(remark_title)
         main_layout.addWidget(self.remark_edit, 0)
+        self.apply_default_selections()
 
         bottom_layout = QHBoxLayout()
         bottom_layout.setSpacing(12)
@@ -189,18 +195,15 @@ class AnnotationWindow(QMainWindow):
 
     def _build_question_groups(self) -> None:
         questions = [question for section in QUESTION_SECTIONS for question in section["questions"]]
-        column_layouts: list[QVBoxLayout] = []
-
-        for _ in range(3):
-            column = QVBoxLayout()
-            column.setSpacing(8)
-            column.setContentsMargins(0, 0, 0, 0)
-            column_layouts.append(column)
-            self.questions_layout.addLayout(column, 1)
 
         for index, question in enumerate(questions):
+            self.question_configs[question["key"]] = question
             self.question_labels[question["key"]] = question["label"]
             self.question_types[question["key"]] = question["type"]
+            if question.get("required"):
+                self.required_question_keys.add(question["key"])
+            if question["type"] == "multi" and question.get("exclusive_value"):
+                self.multi_exclusive_values[question["key"]] = question["exclusive_value"]
 
             card = QFrame()
             card.setFrameShape(QFrame.StyledPanel)
@@ -234,14 +237,18 @@ class AnnotationWindow(QMainWindow):
                     checkbox = QCheckBox(f"{option['label']}  [{option['value']}]")
                     checkbox.setProperty("value", option["value"])
                     checkbox.setStyleSheet("font-size: 11px; padding-top: 1px; padding-bottom: 1px;")
-                    checkbox.stateChanged.connect(self.update_summary)
+                    checkbox.stateChanged.connect(
+                        lambda _state, key=question["key"], box=checkbox: self._handle_multi_change(key, box)
+                    )
                     checkboxes.append(checkbox)
                     card_layout.addWidget(checkbox)
 
-            column_layouts[index % 3].addWidget(card)
+            row = index // 4
+            column = index % 4
+            self.questions_layout.addWidget(card, row, column)
 
-        for column in column_layouts:
-            column.addStretch()
+        for column in range(4):
+            self.questions_layout.setColumnStretch(column, 1)
 
     def _connect_player_signals(self) -> None:
         self.player.positionChanged.connect(self._sync_position)
@@ -357,6 +364,57 @@ class AnnotationWindow(QMainWindow):
         payload = self.collect_annotation()
         self.preview_cache = json.dumps(payload, ensure_ascii=False, indent=2)
 
+    def apply_default_selections(self) -> None:
+        for key, question in self.question_configs.items():
+            default_value = question.get("default")
+            if question["type"] == "single":
+                if not default_value:
+                    continue
+                group = self.single_groups[key]
+                for button in group.buttons():
+                    if button.property("value") == default_value:
+                        button.setChecked(True)
+                        break
+            else:
+                selected_defaults = set(default_value or [])
+                for checkbox in self.multi_groups[key]:
+                    checkbox.setChecked(checkbox.property("value") in selected_defaults)
+
+        self.update_summary()
+
+    def _handle_multi_change(self, key: str, changed_box: QCheckBox) -> None:
+        exclusive_value = self.multi_exclusive_values.get(key)
+        if exclusive_value is None:
+            self.update_summary()
+            return
+
+        checkboxes = self.multi_groups[key]
+        changed_value = changed_box.property("value")
+
+        if changed_box.isChecked() and changed_value == exclusive_value:
+            for checkbox in checkboxes:
+                if checkbox is changed_box:
+                    continue
+                blocker = QSignalBlocker(checkbox)
+                checkbox.setChecked(False)
+                del blocker
+        elif changed_box.isChecked() and changed_value != exclusive_value:
+            for checkbox in checkboxes:
+                if checkbox.property("value") == exclusive_value:
+                    blocker = QSignalBlocker(checkbox)
+                    checkbox.setChecked(False)
+                    del blocker
+                    break
+        elif not any(box.isChecked() for box in checkboxes):
+            for checkbox in checkboxes:
+                if checkbox.property("value") == exclusive_value:
+                    blocker = QSignalBlocker(checkbox)
+                    checkbox.setChecked(True)
+                    del blocker
+                    break
+
+        self.update_summary()
+
     def show_preview_dialog(self) -> None:
         self.update_summary()
         dialog = QDialog(self)
@@ -390,7 +448,7 @@ class AnnotationWindow(QMainWindow):
                 checkbox.setChecked(False)
 
         self.remark_edit.clear()
-        self.update_summary()
+        self.apply_default_selections()
 
     def load_existing_annotation(self) -> None:
         self.reset_current_annotation()
@@ -427,6 +485,16 @@ class AnnotationWindow(QMainWindow):
         audio_path = self.current_audio_path()
         if not audio_path:
             QMessageBox.information(self, "提示", "请先打开一个包含音频文件的文件夹。")
+            return
+
+        missing_labels: list[str] = []
+        for key in self.required_question_keys:
+            group = self.single_groups.get(key)
+            if group is not None and group.checkedButton() is None:
+                missing_labels.append(self.question_labels[key])
+
+        if missing_labels:
+            QMessageBox.warning(self, "必填项未完成", f"请先完成这些题目：{', '.join(missing_labels)}")
             return
 
         payload = self.collect_annotation()
