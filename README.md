@@ -28,9 +28,11 @@ chmod +x build_mac.sh
 build_windows.bat
 ```
 
+运行后脚本会先提示输入版本号，例如 `1.0.0`，生成的目录名和 exe 名都会自动带上版本号。
+
 输出位置：
 
-- `dist/audio-annotation-tool/audio-annotation-tool.exe`
+- `dist/audio-annotation-tool_v1.0.0/audio-annotation-tool_v1.0.0.exe`
 
 ## 功能
 
