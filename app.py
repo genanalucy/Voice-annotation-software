@@ -282,6 +282,30 @@ class AnnotationWindow(QMainWindow):
         hero_text.addWidget(self.audio_name_label)
         hero_text.addStretch()
 
+        inline_controls = QHBoxLayout()
+        inline_controls.setSpacing(6)
+
+        self.prev_button = QPushButton("上一条")
+        self.prev_button.setProperty("variant", "secondary")
+        self.prev_button.clicked.connect(self.play_previous)
+
+        self.play_button = QPushButton("继续播放")
+        self.play_button.setProperty("variant", "primary")
+        self.play_button.clicked.connect(self.resume_playback)
+
+        self.pause_button = QPushButton("暂停")
+        self.pause_button.setProperty("variant", "secondary")
+        self.pause_button.clicked.connect(self.pause_playback)
+
+        self.next_button = QPushButton("下一条")
+        self.next_button.setProperty("variant", "secondary")
+        self.next_button.clicked.connect(self.play_next)
+
+        for button in (self.prev_button, self.play_button, self.pause_button, self.next_button):
+            button.setMinimumHeight(30)
+            button.setMinimumWidth(82)
+            inline_controls.addWidget(button)
+
         hero_actions = QHBoxLayout()
         hero_actions.setSpacing(8)
         hero_actions.addStretch()
@@ -305,6 +329,7 @@ class AnnotationWindow(QMainWindow):
         self.open_excel_button.setMinimumWidth(104)
         self.open_excel_button.clicked.connect(self.choose_excel_file)
 
+        hero_actions.addLayout(inline_controls)
         hero_actions.addWidget(self.theme_button)
         hero_actions.addWidget(self.open_excel_button)
         hero_actions.addWidget(self.open_folder_button)
@@ -362,36 +387,6 @@ class AnnotationWindow(QMainWindow):
         progress_layout.addLayout(progress_header)
         progress_layout.addWidget(self.waveform_bar)
         main_layout.addWidget(progress_card)
-
-        control_card, control_layout = self.create_glass_card("panelCard", 8, 8, 8, 8)
-        controls = QHBoxLayout()
-        controls.setSpacing(8)
-        controls.addStretch()
-
-        self.prev_button = QPushButton("上一条")
-        self.prev_button.setProperty("variant", "secondary")
-        self.prev_button.clicked.connect(self.play_previous)
-
-        self.play_button = QPushButton("继续播放")
-        self.play_button.setProperty("variant", "primary")
-        self.play_button.clicked.connect(self.resume_playback)
-
-        self.pause_button = QPushButton("暂停")
-        self.pause_button.setProperty("variant", "secondary")
-        self.pause_button.clicked.connect(self.pause_playback)
-
-        self.next_button = QPushButton("下一条")
-        self.next_button.setProperty("variant", "secondary")
-        self.next_button.clicked.connect(self.play_next)
-
-        for button in (self.prev_button, self.play_button, self.pause_button, self.next_button):
-            button.setMinimumHeight(32)
-            button.setMinimumWidth(92)
-            controls.addWidget(button)
-
-        controls.addStretch()
-        control_layout.addLayout(controls)
-        main_layout.addWidget(control_card)
 
         questions_shell, questions_shell_layout = self.create_glass_card("panelCard", 10, 8, 10, 8)
         questions_title = QLabel("标注维度")
