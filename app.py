@@ -342,26 +342,32 @@ class AnnotationWindow(QMainWindow):
         transcript_row.setSpacing(8)
 
         source_box, source_layout = self.create_glass_card("infoCard", 8, 6, 8, 6)
-        source_title = QLabel("原文")
+        source_row = QHBoxLayout()
+        source_row.setSpacing(6)
+        source_title = QLabel("原文:")
         source_title.setObjectName("miniSectionTitle")
         self.source_text = QPlainTextEdit()
         self.source_text.setObjectName("transcriptViewer")
         self.source_text.setReadOnly(True)
-        self.source_text.setFixedHeight(50)
+        self.source_text.setFixedHeight(34)
         self.source_text.setPlaceholderText("导入 Excel 后显示对应录音的原文。")
-        source_layout.addWidget(source_title)
-        source_layout.addWidget(self.source_text)
+        source_row.addWidget(source_title)
+        source_row.addWidget(self.source_text, 1)
+        source_layout.addLayout(source_row)
 
         translation_box, translation_layout = self.create_glass_card("infoCard", 8, 6, 8, 6)
-        translation_title = QLabel("中文翻译")
+        translation_row = QHBoxLayout()
+        translation_row.setSpacing(6)
+        translation_title = QLabel("中文翻译:")
         translation_title.setObjectName("miniSectionTitle")
         self.translation_text = QPlainTextEdit()
         self.translation_text.setObjectName("transcriptViewer")
         self.translation_text.setReadOnly(True)
-        self.translation_text.setFixedHeight(50)
+        self.translation_text.setFixedHeight(34)
         self.translation_text.setPlaceholderText("导入 Excel 后显示对应录音的中文翻译。")
-        translation_layout.addWidget(translation_title)
-        translation_layout.addWidget(self.translation_text)
+        translation_row.addWidget(translation_title)
+        translation_row.addWidget(self.translation_text, 1)
+        translation_layout.addLayout(translation_row)
 
         transcript_row.addWidget(source_box, 1)
         transcript_row.addWidget(translation_box, 1)
@@ -998,7 +1004,7 @@ class AnnotationWindow(QMainWindow):
                 color: {theme["text_primary"]};
             }}
             QLabel#miniSectionTitle {{
-                font-size: 11px;
+                font-size: 10px;
                 font-weight: 700;
                 color: {theme["text_primary"]};
             }}
@@ -1019,8 +1025,8 @@ class AnnotationWindow(QMainWindow):
                 background: {theme["input_bg"]};
                 color: {theme["text_primary"]};
                 border: 1px solid {theme["input_border"]};
-                border-radius: 12px;
-                padding: 5px 7px;
+                border-radius: 10px;
+                padding: 4px 6px;
                 font-size: 11px;
             }}
             QPlainTextEdit#jsonPreview {{
