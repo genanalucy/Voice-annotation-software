@@ -260,10 +260,10 @@ class AnnotationWindow(QMainWindow):
         scroll_area.setWidget(content)
 
         main_layout = QVBoxLayout(content)
-        main_layout.setContentsMargins(12, 12, 12, 12)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(10, 10, 10, 10)
+        main_layout.setSpacing(8)
 
-        hero_card, hero_layout = self.create_glass_card("heroCard", 14, 12, 14, 12)
+        hero_card, hero_layout = self.create_glass_card("heroCard", 12, 10, 12, 10)
         hero_row = QHBoxLayout()
         hero_row.setSpacing(12)
 
@@ -289,20 +289,20 @@ class AnnotationWindow(QMainWindow):
         self.theme_button = QPushButton("切换夜间")
         self.theme_button.setCheckable(True)
         self.theme_button.setProperty("variant", "secondary")
-        self.theme_button.setMinimumHeight(38)
-        self.theme_button.setMinimumWidth(122)
+        self.theme_button.setMinimumHeight(34)
+        self.theme_button.setMinimumWidth(108)
         self.theme_button.clicked.connect(self.toggle_theme)
 
         self.open_folder_button = QPushButton("打开音频文件夹")
         self.open_folder_button.setProperty("variant", "secondary")
-        self.open_folder_button.setMinimumHeight(38)
-        self.open_folder_button.setMinimumWidth(138)
+        self.open_folder_button.setMinimumHeight(34)
+        self.open_folder_button.setMinimumWidth(122)
         self.open_folder_button.clicked.connect(self.choose_audio_folder)
 
         self.open_excel_button = QPushButton("导入 Excel")
         self.open_excel_button.setProperty("variant", "secondary")
-        self.open_excel_button.setMinimumHeight(38)
-        self.open_excel_button.setMinimumWidth(118)
+        self.open_excel_button.setMinimumHeight(34)
+        self.open_excel_button.setMinimumWidth(104)
         self.open_excel_button.clicked.connect(self.choose_excel_file)
 
         hero_actions.addWidget(self.theme_button)
@@ -316,24 +316,24 @@ class AnnotationWindow(QMainWindow):
         transcript_row = QHBoxLayout()
         transcript_row.setSpacing(8)
 
-        source_box, source_layout = self.create_glass_card("infoCard", 10, 8, 10, 8)
+        source_box, source_layout = self.create_glass_card("infoCard", 8, 6, 8, 6)
         source_title = QLabel("原文")
         source_title.setObjectName("miniSectionTitle")
         self.source_text = QPlainTextEdit()
         self.source_text.setObjectName("transcriptViewer")
         self.source_text.setReadOnly(True)
-        self.source_text.setFixedHeight(58)
+        self.source_text.setFixedHeight(50)
         self.source_text.setPlaceholderText("导入 Excel 后显示对应录音的原文。")
         source_layout.addWidget(source_title)
         source_layout.addWidget(self.source_text)
 
-        translation_box, translation_layout = self.create_glass_card("infoCard", 10, 8, 10, 8)
+        translation_box, translation_layout = self.create_glass_card("infoCard", 8, 6, 8, 6)
         translation_title = QLabel("中文翻译")
         translation_title.setObjectName("miniSectionTitle")
         self.translation_text = QPlainTextEdit()
         self.translation_text.setObjectName("transcriptViewer")
         self.translation_text.setReadOnly(True)
-        self.translation_text.setFixedHeight(58)
+        self.translation_text.setFixedHeight(50)
         self.translation_text.setPlaceholderText("导入 Excel 后显示对应录音的中文翻译。")
         translation_layout.addWidget(translation_title)
         translation_layout.addWidget(self.translation_text)
@@ -343,7 +343,7 @@ class AnnotationWindow(QMainWindow):
         hero_layout.addLayout(transcript_row)
         main_layout.addWidget(hero_card)
 
-        progress_card, progress_layout = self.create_glass_card("panelCard", 12, 10, 12, 10)
+        progress_card, progress_layout = self.create_glass_card("panelCard", 10, 8, 10, 8)
         progress_header = QHBoxLayout()
         progress_header.setSpacing(8)
 
@@ -363,9 +363,9 @@ class AnnotationWindow(QMainWindow):
         progress_layout.addWidget(self.waveform_bar)
         main_layout.addWidget(progress_card)
 
-        control_card, control_layout = self.create_glass_card("panelCard", 10, 10, 10, 10)
+        control_card, control_layout = self.create_glass_card("panelCard", 8, 8, 8, 8)
         controls = QHBoxLayout()
-        controls.setSpacing(10)
+        controls.setSpacing(8)
         controls.addStretch()
 
         self.prev_button = QPushButton("上一条")
@@ -385,15 +385,15 @@ class AnnotationWindow(QMainWindow):
         self.next_button.clicked.connect(self.play_next)
 
         for button in (self.prev_button, self.play_button, self.pause_button, self.next_button):
-            button.setMinimumHeight(36)
-            button.setMinimumWidth(104)
+            button.setMinimumHeight(32)
+            button.setMinimumWidth(92)
             controls.addWidget(button)
 
         controls.addStretch()
         control_layout.addLayout(controls)
         main_layout.addWidget(control_card)
 
-        questions_shell, questions_shell_layout = self.create_glass_card("panelCard", 12, 10, 12, 10)
+        questions_shell, questions_shell_layout = self.create_glass_card("panelCard", 10, 8, 10, 8)
         questions_title = QLabel("标注维度")
         questions_title.setObjectName("sectionTitle")
         questions_shell_layout.addWidget(questions_title)
@@ -402,48 +402,48 @@ class AnnotationWindow(QMainWindow):
         questions_panel.setObjectName("questionsPanel")
         self.questions_layout = QGridLayout(questions_panel)
         self.questions_layout.setContentsMargins(0, 0, 0, 0)
-        self.questions_layout.setHorizontalSpacing(8)
-        self.questions_layout.setVerticalSpacing(8)
+        self.questions_layout.setHorizontalSpacing(6)
+        self.questions_layout.setVerticalSpacing(6)
         self._build_question_groups()
 
         questions_shell_layout.addWidget(questions_panel)
         main_layout.addWidget(questions_shell)
 
-        remark_card, remark_layout = self.create_glass_card("panelCard", 12, 10, 12, 10)
+        remark_card, remark_layout = self.create_glass_card("panelCard", 10, 8, 10, 8)
         remark_title = QLabel("描述音频")
         remark_title.setObjectName("sectionTitle")
         self.remark_edit = QPlainTextEdit()
         self.remark_edit.setObjectName("remarkEdit")
         self.remark_edit.setPlaceholderText("简要描述这段音频的内容、场景或特殊情况。")
         self.remark_edit.textChanged.connect(self.update_summary)
-        self.remark_edit.setFixedHeight(48)
+        self.remark_edit.setFixedHeight(42)
 
         remark_layout.addWidget(remark_title)
         remark_layout.addWidget(self.remark_edit)
         main_layout.addWidget(remark_card)
         self.apply_default_selections()
 
-        action_card, action_layout = self.create_glass_card("panelCard", 10, 10, 10, 10)
+        action_card, action_layout = self.create_glass_card("panelCard", 8, 8, 8, 8)
         actions = QHBoxLayout()
-        actions.setSpacing(10)
+        actions.setSpacing(8)
         actions.addStretch()
 
         self.preview_button = QPushButton("预览 JSON")
         self.preview_button.setProperty("variant", "secondary")
-        self.preview_button.setMinimumHeight(42)
-        self.preview_button.setMinimumWidth(160)
+        self.preview_button.setMinimumHeight(34)
+        self.preview_button.setMinimumWidth(132)
         self.preview_button.clicked.connect(self.show_preview_dialog)
 
         self.reset_button = QPushButton("重做")
         self.reset_button.setProperty("variant", "secondary")
-        self.reset_button.setMinimumHeight(42)
-        self.reset_button.setMinimumWidth(160)
+        self.reset_button.setMinimumHeight(34)
+        self.reset_button.setMinimumWidth(132)
         self.reset_button.clicked.connect(self.reset_current_annotation)
 
         self.submit_button = QPushButton("提交")
         self.submit_button.setProperty("variant", "primary")
-        self.submit_button.setMinimumHeight(42)
-        self.submit_button.setMinimumWidth(188)
+        self.submit_button.setMinimumHeight(34)
+        self.submit_button.setMinimumWidth(152)
         self.submit_button.clicked.connect(self.submit_annotation)
 
         actions.addWidget(self.preview_button)
@@ -465,9 +465,9 @@ class AnnotationWindow(QMainWindow):
             if question["type"] == "multi" and question.get("exclusive_value"):
                 self.multi_exclusive_values[question["key"]] = question["exclusive_value"]
 
-            card, card_layout = self.create_glass_card("questionCard", 10, 8, 10, 8)
+            card, card_layout = self.create_glass_card("questionCard", 8, 6, 8, 6)
             card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-            card_layout.setSpacing(4)
+            card_layout.setSpacing(2)
 
             label = QLabel(f"{question['label']}  ({question['key']})")
             label.setObjectName("questionTitle")
@@ -965,25 +965,25 @@ class AnnotationWindow(QMainWindow):
             QFrame#heroCard {{
                 background: {theme["panel_bg"]};
                 border: 1px solid {theme["card_border"]};
-                border-radius: 18px;
+                border-radius: 16px;
             }}
             QFrame#panelCard {{
                 background: {theme["panel_alt_bg"]};
                 border: 1px solid {theme["card_border"]};
-                border-radius: 16px;
+                border-radius: 14px;
             }}
             QFrame#infoCard {{
                 background: {theme["card_bg"]};
                 border: 1px solid {theme["card_border"]};
-                border-radius: 14px;
+                border-radius: 12px;
             }}
             QFrame#questionCard {{
                 background: {theme["card_bg"]};
                 border: 1px solid {theme["card_border"]};
-                border-radius: 14px;
+                border-radius: 12px;
             }}
             QLabel#appTitle {{
-                font-size: 24px;
+                font-size: 22px;
                 font-weight: 800;
                 color: {theme["text_primary"]};
             }}
@@ -992,18 +992,18 @@ class AnnotationWindow(QMainWindow):
                 color: {theme["text_muted"]};
             }}
             QLabel#audioNameLabel {{
-                font-size: 19px;
+                font-size: 17px;
                 font-weight: 700;
                 color: {theme["text_primary"]};
-                padding-top: 3px;
+                padding-top: 2px;
             }}
             QLabel#sectionTitle {{
-                font-size: 15px;
+                font-size: 14px;
                 font-weight: 700;
                 color: {theme["text_primary"]};
             }}
             QLabel#miniSectionTitle {{
-                font-size: 12px;
+                font-size: 11px;
                 font-weight: 700;
                 color: {theme["text_primary"]};
             }}
@@ -1013,10 +1013,10 @@ class AnnotationWindow(QMainWindow):
                 color: {theme["text_muted"]};
             }}
             QLabel#questionTitle {{
-                font-size: 13px;
+                font-size: 12px;
                 font-weight: 700;
                 color: {theme["text_primary"]};
-                padding-bottom: 2px;
+                padding-bottom: 1px;
             }}
             QPlainTextEdit#remarkEdit,
             QPlainTextEdit#jsonPreview,
@@ -1025,8 +1025,8 @@ class AnnotationWindow(QMainWindow):
                 color: {theme["text_primary"]};
                 border: 1px solid {theme["input_border"]};
                 border-radius: 12px;
-                padding: 6px 8px;
-                font-size: 12px;
+                padding: 5px 7px;
+                font-size: 11px;
             }}
             QPlainTextEdit#jsonPreview {{
                 font-family: Menlo, Monaco, monospace;
@@ -1034,8 +1034,8 @@ class AnnotationWindow(QMainWindow):
             QPushButton {{
                 border-radius: 12px;
                 border: none;
-                padding: 8px 18px;
-                font-size: 13px;
+                padding: 6px 14px;
+                font-size: 12px;
                 font-weight: 700;
             }}
             QPushButton[variant="primary"] {{
@@ -1057,10 +1057,10 @@ class AnnotationWindow(QMainWindow):
             QCheckBox#optionButton {{
                 color: {theme["text_primary"]};
                 background: transparent;
-                font-size: 11px;
-                spacing: 8px;
+                font-size: 10px;
+                spacing: 6px;
                 padding-top: 1px;
-                padding-bottom: 1px;
+                padding-bottom: 0px;
             }}
         """
 
