@@ -7,7 +7,7 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 from PySide6.QtCore import QSignalBlocker, Qt, QUrl, Signal
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QKeySequence, QPainter, QPainterPath, QPen, QShortcut
 from PySide6.QtMultimedia import QAudioBuffer, QAudioDecoder, QAudioFormat, QAudioOutput, QMediaPlayer
 from PySide6.QtWidgets import (
     QApplication,
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QLineEdit,
     QPlainTextEdit,
     QRadioButton,
     QScrollArea,
@@ -110,7 +111,7 @@ class WaveformSeekBar(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setMinimumHeight(56)
+        self.setMinimumHeight(40)
         self.setCursor(Qt.PointingHandCursor)
         self.waveform_points: list[tuple[float, float]] = []
         self.progress_ratio = 0.0
@@ -162,9 +163,9 @@ class WaveformSeekBar(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
 
-        rect = self.rect().adjusted(0, 6, 0, -6)
+        rect = self.rect().adjusted(0, 4, 0, -4)
         path = QPainterPath()
-        path.addRoundedRect(rect, 16, 16)
+        path.addRoundedRect(rect, 12, 12)
         painter.fillPath(path, self.colors["background"])
 
         points = self.waveform_points or [(-0.18, 0.18)] * 180
@@ -184,8 +185,8 @@ class WaveformSeekBar(QWidget):
             x = rect.left() + (index + 0.5) * step
             clamped_min = max(-1.0, min(1.0, min_value))
             clamped_max = max(-1.0, min(1.0, max_value))
-            y_top = center_y - clamped_max * (rect.height() / 2 - 6)
-            y_bottom = center_y - clamped_min * (rect.height() / 2 - 6)
+            y_top = center_y - clamped_max * (rect.height() / 2 - 4)
+            y_bottom = center_y - clamped_min * (rect.height() / 2 - 4)
             if abs(y_bottom - y_top) < 4:
                 y_top = center_y - 2
                 y_bottom = center_y + 2
@@ -228,13 +229,16 @@ class AnnotationWindow(QMainWindow):
         self.multi_exclusive_values: dict[str, str] = {}
         self.transcript_map: dict[str, dict[str, str]] = {}
         self.preview_cache = "{}"
+        self.annotator_name = ""
         self.current_theme = "light"
         self.shadow_targets: list[QWidget] = []
         self.waveform_decoder: QAudioDecoder | None = None
         self.waveform_decode_path: Path | None = None
         self.waveform_samples: list[float] = []
+        self.shortcuts: list[QShortcut] = []
 
         self._build_ui()
+        self._register_shortcuts()
         self._connect_player_signals()
         self.apply_theme()
         self.update_summary()
@@ -374,24 +378,21 @@ class AnnotationWindow(QMainWindow):
         hero_layout.addLayout(transcript_row)
         main_layout.addWidget(hero_card)
 
-        progress_card, progress_layout = self.create_glass_card("panelCard", 10, 8, 10, 8)
-        progress_header = QHBoxLayout()
-        progress_header.setSpacing(8)
+        progress_card, progress_layout = self.create_glass_card("panelCard", 8, 6, 8, 6)
+        progress_row = QHBoxLayout()
+        progress_row.setSpacing(8)
 
-        progress_title = QLabel("播放进度")
-        progress_title.setObjectName("sectionTitle")
         self.time_label = QLabel("00:00 / 00:00")
         self.time_label.setObjectName("timeLabel")
-
-        progress_header.addWidget(progress_title)
-        progress_header.addStretch()
-        progress_header.addWidget(self.time_label)
+        self.time_label.setAlignment(Qt.AlignCenter)
+        self.time_label.setMinimumWidth(110)
 
         self.waveform_bar = WaveformSeekBar()
         self.waveform_bar.seekRequested.connect(self._on_waveform_seek)
 
-        progress_layout.addLayout(progress_header)
-        progress_layout.addWidget(self.waveform_bar)
+        progress_row.addWidget(self.time_label)
+        progress_row.addWidget(self.waveform_bar, 1)
+        progress_layout.addLayout(progress_row)
         main_layout.addWidget(progress_card)
 
         questions_shell, questions_shell_layout = self.create_glass_card("panelCard", 10, 8, 10, 8)
@@ -410,49 +411,69 @@ class AnnotationWindow(QMainWindow):
         questions_shell_layout.addWidget(questions_panel)
         main_layout.addWidget(questions_shell)
 
-        remark_card, remark_layout = self.create_glass_card("panelCard", 10, 8, 10, 8)
+        bottom_row = QHBoxLayout()
+        bottom_row.setSpacing(8)
+
+        remark_card, remark_layout = self.create_glass_card("panelCard", 8, 6, 8, 6)
         remark_title = QLabel("描述音频")
         remark_title.setObjectName("sectionTitle")
         self.remark_edit = QPlainTextEdit()
         self.remark_edit.setObjectName("remarkEdit")
         self.remark_edit.setPlaceholderText("简要描述这段音频的内容、场景或特殊情况。")
         self.remark_edit.textChanged.connect(self.update_summary)
-        self.remark_edit.setFixedHeight(42)
-
+        self.remark_edit.setFixedHeight(64)
         remark_layout.addWidget(remark_title)
         remark_layout.addWidget(self.remark_edit)
-        main_layout.addWidget(remark_card)
-        self.apply_default_selections()
+        bottom_row.addWidget(remark_card, 7)
 
-        action_card, action_layout = self.create_glass_card("panelCard", 8, 8, 8, 8)
-        actions = QHBoxLayout()
-        actions.setSpacing(8)
-        actions.addStretch()
+        action_card, action_layout = self.create_glass_card("panelCard", 8, 6, 8, 6)
+        action_grid = QGridLayout()
+        action_grid.setContentsMargins(0, 0, 0, 0)
+        action_grid.setHorizontalSpacing(6)
+        action_grid.setVerticalSpacing(6)
+
+        annotator_title = QLabel("标注人")
+        annotator_title.setObjectName("compactFieldTitle")
+        self.annotator_edit = QLineEdit()
+        self.annotator_edit.setObjectName("annotatorEdit")
+        self.annotator_edit.setPlaceholderText("填写标注人姓名")
+        self.annotator_edit.textChanged.connect(self._update_annotator_name)
+        self.annotator_edit.setFixedHeight(30)
+
+        annotator_field = QWidget()
+        annotator_layout = QHBoxLayout(annotator_field)
+        annotator_layout.setContentsMargins(0, 0, 0, 0)
+        annotator_layout.setSpacing(6)
+        annotator_layout.addWidget(annotator_title)
+        annotator_layout.addWidget(self.annotator_edit)
 
         self.preview_button = QPushButton("预览 JSON")
         self.preview_button.setProperty("variant", "secondary")
-        self.preview_button.setMinimumHeight(34)
-        self.preview_button.setMinimumWidth(132)
+        self.preview_button.setMinimumHeight(30)
+        self.preview_button.setMinimumWidth(118)
         self.preview_button.clicked.connect(self.show_preview_dialog)
 
         self.reset_button = QPushButton("重做")
         self.reset_button.setProperty("variant", "secondary")
-        self.reset_button.setMinimumHeight(34)
-        self.reset_button.setMinimumWidth(132)
+        self.reset_button.setMinimumHeight(30)
+        self.reset_button.setMinimumWidth(118)
         self.reset_button.clicked.connect(self.reset_current_annotation)
 
         self.submit_button = QPushButton("提交")
         self.submit_button.setProperty("variant", "primary")
-        self.submit_button.setMinimumHeight(34)
-        self.submit_button.setMinimumWidth(152)
+        self.submit_button.setMinimumHeight(30)
+        self.submit_button.setMinimumWidth(118)
         self.submit_button.clicked.connect(self.submit_annotation)
 
-        actions.addWidget(self.preview_button)
-        actions.addWidget(self.reset_button)
-        actions.addWidget(self.submit_button)
-        actions.addStretch()
-        action_layout.addLayout(actions)
-        main_layout.addWidget(action_card)
+        action_grid.addWidget(self.preview_button, 0, 0)
+        action_grid.addWidget(annotator_field, 0, 1)
+        action_grid.addWidget(self.reset_button, 1, 0)
+        action_grid.addWidget(self.submit_button, 1, 1)
+        action_layout.addLayout(action_grid)
+        bottom_row.addWidget(action_card, 3)
+
+        main_layout.addLayout(bottom_row)
+        self.apply_default_selections()
         main_layout.addStretch()
 
     def _build_question_groups(self) -> None:
@@ -468,7 +489,7 @@ class AnnotationWindow(QMainWindow):
 
             card, card_layout = self.create_glass_card("questionCard", 8, 6, 8, 6)
             card.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
-            card_layout.setSpacing(2)
+            card_layout.setSpacing(3)
 
             label = QLabel(f"{question['label']}  ({question['key']})")
             label.setObjectName("questionTitle")
@@ -510,6 +531,21 @@ class AnnotationWindow(QMainWindow):
         self.player.positionChanged.connect(self._sync_position)
         self.player.durationChanged.connect(self._sync_duration)
         self.player.mediaStatusChanged.connect(self._on_media_status_changed)
+
+    def _register_shortcuts(self) -> None:
+        shortcut_bindings = [
+            ("Ctrl+Left", self.play_previous),
+            ("Ctrl+Right", self.play_next),
+            ("Space", self.toggle_playback),
+            ("Return", self.submit_annotation),
+            ("Enter", self.submit_annotation),
+        ]
+
+        for sequence, handler in shortcut_bindings:
+            shortcut = QShortcut(QKeySequence(sequence), self)
+            shortcut.setContext(Qt.WindowShortcut)
+            shortcut.activated.connect(handler)
+            self.shortcuts.append(shortcut)
 
     def choose_audio_folder(self) -> None:
         directory = QFileDialog.getExistingDirectory(self, "选择音频文件夹", str(Path.cwd()))
@@ -610,6 +646,15 @@ class AnnotationWindow(QMainWindow):
             return
         self.player.play()
 
+    def toggle_playback(self) -> None:
+        if not self.audio_files:
+            self.choose_audio_folder()
+            return
+        if self.player.playbackState() == QMediaPlayer.PlayingState:
+            self.player.pause()
+        else:
+            self.player.play()
+
     def _on_waveform_seek(self, ratio: float) -> None:
         duration = self.player.duration()
         if duration > 0:
@@ -652,6 +697,10 @@ class AnnotationWindow(QMainWindow):
         self.source_text.setPlainText(record.get("source", ""))
         self.translation_text.setPlainText(record.get("translation", ""))
 
+    def _update_annotator_name(self, text: str) -> None:
+        self.annotator_name = text.strip()
+        self.update_summary()
+
     def collect_annotation(self) -> dict:
         audio_path = self.current_audio_path()
         payload: dict[str, object] = {"audio_id": audio_path.stem if audio_path else ""}
@@ -664,6 +713,7 @@ class AnnotationWindow(QMainWindow):
             payload[key] = [box.property("value") for box in checkboxes if box.isChecked()]
 
         payload[REMARK_KEY] = self.remark_edit.toPlainText().strip()
+        payload["annotator"] = self.annotator_name
         return payload
 
     def update_summary(self) -> None:
@@ -1008,20 +1058,34 @@ class AnnotationWindow(QMainWindow):
                 font-weight: 700;
                 color: {theme["text_primary"]};
             }}
+            QLabel#compactFieldTitle {{
+                font-size: 10px;
+                font-weight: 700;
+                color: {theme["text_primary"]};
+                min-width: 36px;
+            }}
             QLabel#timeLabel {{
                 font-size: 13px;
                 font-weight: 600;
                 color: {theme["text_muted"]};
             }}
             QLabel#questionTitle {{
-                font-size: 12px;
+                font-size: 13px;
                 font-weight: 700;
                 color: {theme["text_primary"]};
-                padding-bottom: 1px;
+                padding-bottom: 2px;
             }}
             QPlainTextEdit#remarkEdit,
             QPlainTextEdit#jsonPreview,
             QPlainTextEdit#transcriptViewer {{
+                background: {theme["input_bg"]};
+                color: {theme["text_primary"]};
+                border: 1px solid {theme["input_border"]};
+                border-radius: 10px;
+                padding: 4px 6px;
+                font-size: 11px;
+            }}
+            QLineEdit#annotatorEdit {{
                 background: {theme["input_bg"]};
                 color: {theme["text_primary"]};
                 border: 1px solid {theme["input_border"]};
@@ -1058,10 +1122,10 @@ class AnnotationWindow(QMainWindow):
             QCheckBox#optionButton {{
                 color: {theme["text_primary"]};
                 background: transparent;
-                font-size: 10px;
-                spacing: 6px;
+                font-size: 11px;
+                spacing: 7px;
                 padding-top: 1px;
-                padding-bottom: 0px;
+                padding-bottom: 1px;
             }}
         """
 
