@@ -1127,15 +1127,18 @@ class AnnotationWindow(QMainWindow):
                 padding-bottom: 1px;
             }}
             QRadioButton#optionButton::indicator {{
-                width: 14px;
-                height: 14px;
-                border-radius: 8px;
+                width: 15px;
+                height: 15px;
+                border-radius: 7px;
                 border: 1px solid {theme["input_border"]};
                 background: {theme["input_bg"]};
             }}
             QRadioButton#optionButton::indicator:checked {{
-                border: 4px solid {theme["accent"]};
-                background: {theme["input_bg"]};
+                width: 15px;
+                height: 15px;
+                border-radius: 7px;
+                border: 1px solid {theme["accent"]};
+                background: {theme["accent"]};
             }}
             QCheckBox#optionButton::indicator {{
                 width: 14px;
