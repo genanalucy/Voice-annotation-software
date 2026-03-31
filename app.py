@@ -474,7 +474,6 @@ class AnnotationWindow(QMainWindow):
 
         main_layout.addLayout(bottom_row)
         self.apply_default_selections()
-        main_layout.addStretch()
 
     def _build_question_groups(self) -> None:
         questions = [question for section in QUESTION_SECTIONS for question in section["questions"]]
@@ -1126,6 +1125,28 @@ class AnnotationWindow(QMainWindow):
                 spacing: 7px;
                 padding-top: 1px;
                 padding-bottom: 1px;
+            }}
+            QRadioButton#optionButton::indicator {{
+                width: 14px;
+                height: 14px;
+                border-radius: 8px;
+                border: 1px solid {theme["input_border"]};
+                background: {theme["input_bg"]};
+            }}
+            QRadioButton#optionButton::indicator:checked {{
+                border: 4px solid {theme["accent"]};
+                background: {theme["input_bg"]};
+            }}
+            QCheckBox#optionButton::indicator {{
+                width: 14px;
+                height: 14px;
+                border-radius: 4px;
+                border: 1px solid {theme["input_border"]};
+                background: {theme["input_bg"]};
+            }}
+            QCheckBox#optionButton::indicator:checked {{
+                background: {theme["accent"]};
+                border: 1px solid {theme["accent"]};
             }}
         """
 
