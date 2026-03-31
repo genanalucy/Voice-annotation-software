@@ -500,8 +500,9 @@ class AnnotationWindow(QMainWindow):
                 group.setExclusive(True)
                 self.single_groups[question["key"]] = group
                 for option in question["options"]:
-                    button = QRadioButton(f"{option['label']}  [{option['value']}]")
+                    button = QRadioButton(str(option["value"]))
                     button.setProperty("value", option["value"])
+                    button.setToolTip(str(option["label"]))
                     button.setObjectName("optionButton")
                     button.toggled.connect(self.update_summary)
                     group.addButton(button)
@@ -510,8 +511,9 @@ class AnnotationWindow(QMainWindow):
                 checkboxes: list[QCheckBox] = []
                 self.multi_groups[question["key"]] = checkboxes
                 for option in question["options"]:
-                    checkbox = QCheckBox(f"{option['label']}  [{option['value']}]")
+                    checkbox = QCheckBox(str(option["value"]))
                     checkbox.setProperty("value", option["value"])
+                    checkbox.setToolTip(str(option["label"]))
                     checkbox.setObjectName("optionButton")
                     checkbox.stateChanged.connect(
                         lambda _state, key=question["key"], box=checkbox: self._handle_multi_change(key, box)
