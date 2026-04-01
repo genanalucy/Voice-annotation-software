@@ -228,6 +228,7 @@ class AnnotationWindow(QMainWindow):
         self.required_question_keys: set[str] = set()
         self.multi_exclusive_values: dict[str, str] = {}
         self.transcript_map: dict[str, dict[str, str]] = {}
+        self.annotated_audio_ids: set[str] = set()
         self.preview_cache = "{}"
         self.annotator_name = ""
         self.current_theme = "light"
@@ -282,10 +283,18 @@ class AnnotationWindow(QMainWindow):
         #app_subtitle.setObjectName("appSubtitle")
         self.audio_name_label = QLabel("当前音频：未加载")
         self.audio_name_label.setObjectName("audioNameLabel")
+        self.annotation_status_label = QLabel("未标注")
+        self.annotation_status_label.setObjectName("annotationStatusLabel")
+
+        audio_header_row = QHBoxLayout()
+        audio_header_row.setSpacing(8)
+        audio_header_row.addWidget(self.audio_name_label)
+        audio_header_row.addWidget(self.annotation_status_label)
+        audio_header_row.addStretch()
 
         hero_text.addWidget(app_title)
         #hero_text.addWidget(app_subtitle)
-        hero_text.addWidget(self.audio_name_label)
+        hero_text.addLayout(audio_header_row)
 
         inline_controls = QHBoxLayout()
         inline_controls.setSpacing(6)
@@ -614,7 +623,10 @@ class AnnotationWindow(QMainWindow):
 
         self.audio_dir = folder
         self.audio_files = files
-        self.audio_index = 0
+        self.refresh_annotated_cache()
+        self.audio_index = self.first_unannotated_index()
+        if self.audio_index < 0:
+            self.audio_index = 0
         self.load_current_audio(auto_play=False)
 
     def load_current_audio(self, auto_play: bool = True) -> None:
@@ -622,7 +634,7 @@ class AnnotationWindow(QMainWindow):
             return
 
         audio_path = self.audio_files[self.audio_index]
-        self.audio_name_label.setText(f"当前音频：{audio_path.name}")
+        self.update_audio_header(audio_path)
         self.player.setSource(QUrl.fromLocalFile(str(audio_path)))
         self.waveform_bar.set_progress(0, 0)
         self.start_waveform_decode(audio_path)
@@ -696,6 +708,34 @@ class AnnotationWindow(QMainWindow):
         if not audio_path:
             return None
         return self.json_dir / f"{audio_path.stem}.json"
+
+    def refresh_annotated_cache(self) -> None:
+        self.annotated_audio_ids = {path.stem for path in self.json_dir.glob("*.json")}
+
+    def is_audio_annotated(self, audio_path: Path | None) -> bool:
+        if audio_path is None:
+            return False
+        return audio_path.stem in self.annotated_audio_ids
+
+    def first_unannotated_index(self) -> int:
+        for index, audio_path in enumerate(self.audio_files):
+            if not self.is_audio_annotated(audio_path):
+                return index
+        return -1
+
+    def update_audio_header(self, audio_path: Path | None) -> None:
+        if audio_path is None:
+            self.audio_name_label.setText("当前音频：未加载")
+            self.annotation_status_label.setText("未标注")
+            self.annotation_status_label.setProperty("annotated", False)
+        else:
+            annotated = self.is_audio_annotated(audio_path)
+            self.audio_name_label.setText(f"当前音频：{audio_path.name}")
+            self.annotation_status_label.setText("✓ 已标注" if annotated else "未标注")
+            self.annotation_status_label.setProperty("annotated", annotated)
+        self.annotation_status_label.style().unpolish(self.annotation_status_label)
+        self.annotation_status_label.style().polish(self.annotation_status_label)
+        self.annotation_status_label.update()
 
     def update_transcript_display(self) -> None:
         audio_path = self.current_audio_path()
@@ -873,6 +913,8 @@ class AnnotationWindow(QMainWindow):
             return
 
         json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.refresh_annotated_cache()
+        self.update_audio_header(self.current_audio_path())
         QMessageBox.information(self, "提交成功", f"已生成：{json_path}")
 
     def toggle_theme(self) -> None:
@@ -1058,6 +1100,15 @@ class AnnotationWindow(QMainWindow):
                 font-weight: 700;
                 color: {theme["text_primary"]};
                 padding-top: 2px;
+            }}
+            QLabel#annotationStatusLabel {{
+                font-size: 12px;
+                font-weight: 700;
+                color: {theme["text_muted"]};
+                padding-top: 5px;
+            }}
+            QLabel#annotationStatusLabel[annotated="true"] {{
+                color: #18a058;
             }}
             QLabel#sectionTitle {{
                 font-size: 14px;
