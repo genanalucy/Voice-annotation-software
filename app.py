@@ -915,7 +915,6 @@ class AnnotationWindow(QMainWindow):
         json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
         self.refresh_annotated_cache()
         self.update_audio_header(self.current_audio_path())
-        QMessageBox.information(self, "提交成功", f"已生成：{json_path}")
 
     def toggle_theme(self) -> None:
         self.current_theme = "dark" if self.theme_button.isChecked() else "light"
